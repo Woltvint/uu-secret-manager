@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+// Colors for output
+const RED = '\x1b[31m';
+const YELLOW = '\x1b[33m';
+const GREEN = '\x1b[32m';
+const RESET = '\x1b[0m';
+
+// Check if secrets file exists
+const secretsPath = 'uu-secret-manager.json';
+if (!fs.existsSync(secretsPath)) {
+  // No secrets file, skip check
+  process.exit(0);
+}
+
+// Get list of staged files
+let stagedFiles;
+try {
+  stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' })
+    .split('\n')
+    .filter(f => f.trim() && fs.existsSync(f));
+} catch (error) {
+  console.error(`${RED}Error getting staged files:${RESET}`, error.message);
+  process.exit(0);
+}
+
+if (stagedFiles.length === 0) {
+  process.exit(0);
+}
+
+// Check for secrets in staged files
+let foundIssues = false;
+
+for (const file of stagedFiles) {
+  // Skip binary files, node_modules, and the secrets file itself
+  if (file === secretsPath || 
+      file.includes('node_modules') ||
+      file.match(/\.(png|jpg|jpeg|gif|ico|pdf|zip|tar|gz|bin|exe)$/i)) {
+    continue;
+  }
+
+  try {
+    const content = fs.readFileSync(file, 'utf8');
+    
+    // Check for common secret patterns that are NOT placeholders
+    const secretPatterns = [
+      { pattern: /password\s*[=:]\s*["'](?!<!secret_)[^"'\s]{8,}["']/gi, name: 'password' },
+      { pattern: /api[_-]?key\s*[=:]\s*["'](?!<!secret_)[^"'\s]{16,}["']/gi, name: 'API key' },
+      { pattern: /secret\s*[=:]\s*["'](?!<!secret_)[^"'\s]{16,}["']/gi, name: 'secret' },
+      { pattern: /token\s*[=:]\s*["'](?!<!secret_)[^"'\s]{16,}["']/gi, name: 'token' },
+      { pattern: /Bearer\s+(?!<!secret_)[A-Za-z0-9\-._~+\/]+=*/gi, name: 'Bearer token' },
+      { pattern: /AWS_SECRET_ACCESS_KEY\s*[=:]\s*["'](?!<!secret_)[^"'\s]+["']/gi, name: 'AWS secret' },
+      { pattern: /PRIVATE[_-]?KEY/gi, name: 'private key' },
+      { pattern: /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----/gi, name: 'private key block' },
+    ];
+    
+    let fileHasIssues = false;
+    
+    for (const { pattern, name } of secretPatterns) {
+      const matches = content.match(pattern);
+      if (matches && matches.length > 0) {
+        if (!fileHasIssues) {
+          console.error(`\n${RED}⚠️  Potential secret found in: ${file}${RESET}`);
+          fileHasIssues = true;
+          foundIssues = true;
+        }
+        console.error(`   ${YELLOW}• Found ${name}: ${matches[0].substring(0, 40)}...${RESET}`);
+      }
+    }
+    
+    if (fileHasIssues) {
+      console.error(`   ${GREEN}💡 Consider: npx . add "<secret>" then npx . replace "${file}"${RESET}`);
+    }
+    
+  } catch (error) {
+    // Skip files that can't be read as text
+    continue;
+  }
+}
+
+if (foundIssues) {
+  console.error(`\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}`);
+  console.error(`${RED}⚠️  WARNING: Potential secrets detected in staged files!${RESET}`);
+  console.error(`${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}`);
+  console.error(`\n${YELLOW}Recommendations:${RESET}`);
+  console.error(`  1. Use: ${GREEN}npx . add "<your-secret>"${RESET} to store secrets`);
+  console.error(`  2. Use: ${GREEN}npx . replace <file-or-directory>${RESET} to replace with placeholders`);
+  console.error(`  3. Review the changes and stage again\n`);
+  console.error(`${YELLOW}To commit anyway (NOT recommended), use: git commit --no-verify${RESET}\n`);
+  
+  process.exit(1);
+}
+
+// Success
+process.exit(0);

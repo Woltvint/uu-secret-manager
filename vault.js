@@ -16,6 +16,49 @@ function promptPassword(question) {
   });
 }
 
+function readPasswordFromStdin() {
+  return new Promise((resolve, reject) => {
+    // Check if stdin is a pipe/file (not a terminal)
+    if (!process.stdin.isTTY) {
+      let data = '';
+      process.stdin.setEncoding('utf8');
+      process.stdin.on('data', chunk => data += chunk);
+      process.stdin.on('end', () => resolve(data.trim()));
+      process.stdin.on('error', reject);
+    } else {
+      resolve(null);
+    }
+  });
+}
+
+async function getPassword(options = {}) {
+  // Priority: 1. Password file, 2. Password param, 3. Stdin, 4. Prompt
+  
+  // 1. Check password file
+  if (options.passwordFile) {
+    try {
+      const password = fs.readFileSync(options.passwordFile, 'utf8').trim();
+      return password;
+    } catch (err) {
+      throw new Error(`Failed to read password file: ${err.message}`);
+    }
+  }
+  
+  // 2. Check password parameter
+  if (options.password) {
+    return options.password;
+  }
+  
+  // 3. Check stdin (if piped)
+  const stdinPassword = await readPasswordFromStdin();
+  if (stdinPassword) {
+    return stdinPassword;
+  }
+  
+  // 4. Prompt user
+  return await promptPassword('Vault password: ');
+}
+
 async function decryptVaultFile(vaultPath, password) {
   try {
     const vault = new Vault({ password });
@@ -39,6 +82,7 @@ async function encryptVaultFile(vaultPath, password, data) {
 
 module.exports = {
   promptPassword,
+  getPassword,
   decryptVaultFile,
   encryptVaultFile
 };

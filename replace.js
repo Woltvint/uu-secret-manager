@@ -15,7 +15,9 @@ function walkDir(dir, callback) {
 function replaceSecretsInFile(filePath, secrets) {
   let content = fs.readFileSync(filePath, 'utf8');
   let replaced = false;
-  Object.entries(secrets).forEach(([uuid, secret]) => {
+  Object.entries(secrets).forEach(([uuid, data]) => {
+    // Handle both old format (string) and new format (object)
+    const secret = typeof data === 'string' ? data : data.secret;
     const placeholder = `<!secret_${uuid}!>`;
     if (content.includes(secret)) {
       content = content.split(secret).join(placeholder);
@@ -32,7 +34,9 @@ function replaceSecretsInFile(filePath, secrets) {
 function reverseSecretsInFile(filePath, secrets) {
   let content = fs.readFileSync(filePath, 'utf8');
   let replaced = false;
-  Object.entries(secrets).forEach(([uuid, secret]) => {
+  Object.entries(secrets).forEach(([uuid, data]) => {
+    // Handle both old format (string) and new format (object)
+    const secret = typeof data === 'string' ? data : data.secret;
     const placeholder = `<!secret_${uuid}!>`;
     if (content.includes(placeholder)) {
       content = content.split(placeholder).join(secret);

@@ -1,11 +1,11 @@
 node_modules/
 
-# Test artifacts
-test/test-secrets.json
-test/backup/
+# Test artifacts - tests run in /tmp but keep test-data for reference
+test-data/uu-secret-manager.json
+test-data/backup/
 
 # Secrets file
-secrets.json
+uu-secret-manager.json
 
 # Logs
 *.log
