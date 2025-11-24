@@ -120,4 +120,5 @@ node cli.js list
 
 ## License
 
-ISC
+MIT
+
