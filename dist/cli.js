@@ -248,7 +248,7 @@ program
                     console.log(`Replaced secrets in: ${filePath}`);
                     replacedFiles++;
                 }
-            });
+            }, gitRoot);
         }
         if (replacedFiles === 0) {
             console.log('No secrets replaced.');
@@ -293,7 +293,7 @@ program
                     console.log(`Reversed placeholders in: ${filePath}`);
                     reversedFiles++;
                 }
-            });
+            }, gitRoot);
         }
         if (reversedFiles === 0) {
             console.log('No placeholders reversed.');

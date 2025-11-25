@@ -33,21 +33,49 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isGitIgnored = isGitIgnored;
 exports.walkDir = walkDir;
 exports.replaceSecretsInFile = replaceSecretsInFile;
 exports.reverseSecretsInFile = reverseSecretsInFile;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const child_process_1 = require("child_process");
+/**
+ * Checks if a file is ignored by git
+ * @param filePath - Path to the file to check
+ * @param gitRoot - Root directory of the git repository
+ * @returns true if the file is ignored by git, false otherwise
+ */
+function isGitIgnored(filePath, gitRoot) {
+    try {
+        // Use git check-ignore to check if file is ignored
+        (0, child_process_1.execSync)(`git check-ignore "${filePath}"`, {
+            cwd: gitRoot,
+            stdio: 'pipe'
+        });
+        // If command succeeds, file is ignored
+        return true;
+    }
+    catch {
+        // If command fails (exit code 1), file is not ignored
+        return false;
+    }
+}
 /**
  * Recursively walks a directory and calls callback for each file
  * @param dir - Directory path to walk
  * @param callback - Function to call for each file found
+ * @param gitRoot - Optional git root to respect .gitignore
  */
-function walkDir(dir, callback) {
+function walkDir(dir, callback, gitRoot) {
     fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
         const fullPath = path.join(dir, entry.name);
+        // Skip if ignored by git
+        if (gitRoot && isGitIgnored(fullPath, gitRoot)) {
+            return;
+        }
         if (entry.isDirectory()) {
-            walkDir(fullPath, callback);
+            walkDir(fullPath, callback, gitRoot);
         }
         else if (entry.isFile()) {
             callback(fullPath);

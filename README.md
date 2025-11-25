@@ -132,6 +132,8 @@ The CSV file will contain columns: UUID, Secret, Description, Created, Placehold
 
 Replace all secrets in files with their placeholders. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
 
+**Note**: The replace command respects `.gitignore` and will skip files that are ignored by git.
+
 ```bash
 # Replace in entire repository
 repo-secret-manager replace
@@ -146,6 +148,8 @@ repo-secret-manager replace ./config/database.yml
 ### Reverse Placeholders to Secrets
 
 Restore all placeholders in files back to their original secret values. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
+
+**Note**: The reverse command respects `.gitignore` and will skip files that are ignored by git.
 
 ```bash
 # Reverse in entire repository

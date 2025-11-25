@@ -241,6 +241,34 @@ function cleanup() {
             }
             assert.ok(!output.includes('Error'), 'Should not have errors');
         });
+        (0, node_test_1.test)('should respect .gitignore', () => {
+            // Create a .gitignore file
+            const gitignorePath = path.join(TEST_REPO_DIR, '.gitignore');
+            fs.writeFileSync(gitignorePath, 'ignored-file.txt\nignored-dir/\n');
+            // Create an ignored file with a secret
+            const ignoredFile = path.join(TEST_REPO_DIR, 'ignored-file.txt');
+            const testSecret = secrets[0];
+            fs.writeFileSync(ignoredFile, `This file has a secret: ${testSecret}`);
+            // Create an ignored directory with a file containing a secret
+            const ignoredDir = path.join(TEST_REPO_DIR, 'ignored-dir');
+            fs.mkdirSync(ignoredDir);
+            const ignoredDirFile = path.join(ignoredDir, 'file.txt');
+            fs.writeFileSync(ignoredDirFile, `Another secret: ${testSecret}`);
+            // Run replace command
+            const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} replace`);
+            assert.ok(!output.includes('Error'), 'Should not have errors');
+            // Verify ignored files still contain the actual secret (not replaced)
+            const ignoredContent = fs.readFileSync(ignoredFile, 'utf8');
+            const ignoredDirContent = fs.readFileSync(ignoredDirFile, 'utf8');
+            assert.ok(ignoredContent.includes(testSecret), 'Ignored file should still have actual secret');
+            assert.ok(!ignoredContent.includes('<!secret_'), 'Ignored file should not have placeholder');
+            assert.ok(ignoredDirContent.includes(testSecret), 'Ignored dir file should still have actual secret');
+            assert.ok(!ignoredDirContent.includes('<!secret_'), 'Ignored dir file should not have placeholder');
+            // Cleanup
+            fs.unlinkSync(ignoredFile);
+            fs.rmSync(ignoredDir, { recursive: true });
+            fs.unlinkSync(gitignorePath);
+        });
     });
     (0, node_test_1.describe)('Git Hook', () => {
         (0, node_test_1.test)('should install git hook', () => {
