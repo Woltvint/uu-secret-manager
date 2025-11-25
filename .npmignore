@@ -13,20 +13,16 @@ tsconfig.*.json
 # Dependencies
 node_modules/
 
-# Old JavaScript files
+# Git
+.git/
+.gitignore
+.gitattributes
+.editorconfig
+
+# Old JavaScript files (if any exist)
 cli.js
 vault.js
 replace.js
 install-hook.js
 test.js
 test.sh
-
-# Documentation
-README.md
-LICENSE
-*.md
-
-# Git
-.git/
-.gitignore
-.gitattributes
