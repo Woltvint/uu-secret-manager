@@ -105,6 +105,55 @@ program
   });
 
 program
+  .command('export <csvPath>')
+  .description('Export secrets to a CSV file')
+  .action(async (csvPath: string, _options, command) => {
+    try {
+      const globalOpts = command.parent!.opts();
+      const repoPath = globalOpts.repo;
+      const secretsPath = getSecretsPath(repoPath);
+      const password = await vault.getPassword(globalOpts);
+      const decrypted = await vault.decryptVaultFile(secretsPath, password);
+      const secrets: SecretsMap = JSON.parse(decrypted);
+      
+      // Build CSV content
+      const csvLines: string[] = ['UUID,Secret,Description,Created,Placeholder'];
+      
+      Object.entries(secrets).forEach(([uuid, data]) => {
+        const secret = typeof data === 'string' ? data : data.secret;
+        const description = typeof data === 'object' ? data.description || '' : '';
+        const created = typeof data === 'object' ? data.created || '' : '';
+        const placeholder = `<!secret_${uuid}!>`;
+        
+        // Escape CSV values (handle commas and quotes)
+        const escapeCsv = (value: string): string => {
+          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        };
+        
+        csvLines.push([
+          escapeCsv(uuid),
+          escapeCsv(secret),
+          escapeCsv(description),
+          escapeCsv(created),
+          escapeCsv(placeholder)
+        ].join(','));
+      });
+      
+      const csvContent = csvLines.join('\n');
+      const resolvedPath = path.resolve(csvPath);
+      fs.writeFileSync(resolvedPath, csvContent, 'utf8');
+      
+      console.log(`Exported ${Object.keys(secrets).length} secrets to: ${resolvedPath}`);
+    } catch (err) {
+      console.error('Error exporting secrets:', (err as Error).message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('add <secret> [description]')
   .description('Add a secret to the store with optional description')
   .action(async (secret: string, description: string | undefined, _options, command) => {
@@ -165,7 +214,7 @@ program
       }
       
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
-      const secretsPath = path.join(gitRoot, 'uu-secret-manager.json');
+      const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
       
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
@@ -212,7 +261,7 @@ program
       }
       
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
-      const secretsPath = path.join(gitRoot, 'uu-secret-manager.json');
+      const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
       
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);

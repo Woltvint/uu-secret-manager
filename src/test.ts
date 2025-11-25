@@ -174,6 +174,25 @@ describe('repo-secret-manager', () => {
       assert.ok(output.toLowerCase().includes('error') || output.toLowerCase().includes('already exists'), 
         'Should prevent adding duplicate secret');
     });
+
+    test('should export secrets to CSV', () => {
+      const csvPath = path.join(TEST_REPO_DIR, 'secrets-export.csv');
+      const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} export "${csvPath}"`);
+      
+      assert.ok(output.includes('Exported'), 'Should confirm export');
+      assert.ok(fs.existsSync(csvPath), 'CSV file should exist');
+      
+      const csvContent = fs.readFileSync(csvPath, 'utf8');
+      const lines = csvContent.split('\n');
+      
+      assert.ok(lines[0].includes('UUID,Secret,Description,Created,Placeholder'), 'Should have CSV header');
+      assert.ok(lines.length > 1, 'Should have data rows');
+      
+      // Verify secrets are in CSV
+      for (const secret of secrets) {
+        assert.ok(csvContent.includes(secret), `CSV should contain secret: ${secret}`);
+      }
+    });
   });
 
   describe('Replace and Reverse Operations', () => {
@@ -186,6 +205,9 @@ describe('repo-secret-manager', () => {
 
     test('should replace secrets with placeholders', () => {
       const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} replace`);
+      if (output.includes('Error')) {
+        console.error('Replace command output:', output);
+      }
       assert.ok(!output.includes('Error'), 'Should not have errors');
     });
 
@@ -214,6 +236,9 @@ describe('repo-secret-manager', () => {
 
     test('should reverse placeholders back to secrets', () => {
       const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} reverse`);
+      if (output.includes('Error')) {
+        console.error('Reverse command output:', output);
+      }
       assert.ok(!output.includes('Error'), 'Should not have errors');
     });
   });

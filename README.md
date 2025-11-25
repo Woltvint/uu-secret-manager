@@ -7,6 +7,7 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Store secrets in an encrypted JSON file using ansible-vault
 - Automatically places secrets file in git repository root
 - List all stored secrets
+- Export secrets to CSV for backup or migration
 - Add new secrets with UUID-based placeholders
 - Replace secrets in files with placeholders (`<!secret_{uuid}!>`)
 - Reverse placeholders back to original secrets
@@ -22,12 +23,30 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 
 ## Installation
 
+### Run directly from GitHub (no installation needed)
+
+You can run the tool directly from GitHub using npx:
+
+```bash
+npx github:Woltvint/repo-secret-manager <command>
+```
+
+Examples:
+```bash
+npx github:Woltvint/repo-secret-manager add "my-secret"
+npx github:Woltvint/repo-secret-manager list
+npx github:Woltvint/repo-secret-manager replace
+```
+
+### Install locally
+
 ```bash
 npm install
 chmod +x cli.js
 ```
 
-Or install globally:
+### Install globally
+
 ```bash
 npm install -g .
 ```
@@ -71,8 +90,10 @@ The secrets file will be created in the root of your git repository as `repo-sec
 
 ```bash
 repo-secret-manager add "my-secret-password"
-# or with npx:
+# or with npx from npm:
 npx repo-secret-manager add "my-secret-password"
+# or directly from GitHub:
+npx github:Woltvint/repo-secret-manager add "my-secret-password"
 ```
 
 Output:
@@ -87,9 +108,25 @@ List all secrets stored in the encrypted file.
 
 ```bash
 repo-secret-manager list
-# or with npx:
+# or with npx from npm:
 npx repo-secret-manager list
+# or directly from GitHub:
+npx github:Woltvint/repo-secret-manager list
 ```
+
+### Export Secrets to CSV
+
+Export all secrets to a CSV file for backup or migration purposes.
+
+```bash
+repo-secret-manager export ./secrets-backup.csv
+# or with npx from npm:
+npx repo-secret-manager export ./secrets-backup.csv
+# or directly from GitHub:
+npx github:Woltvint/repo-secret-manager export ./secrets-backup.csv
+```
+
+The CSV file will contain columns: UUID, Secret, Description, Created, Placeholder
 
 ### Replace Secrets in Files
 
@@ -167,7 +204,10 @@ repo-secret-manager reverse
 # 7. List all stored secrets
 repo-secret-manager list
 
-# 8. Work with a different repository
+# 8. Export secrets to CSV for backup
+repo-secret-manager export ./secrets-backup.csv
+
+# 9. Work with a different repository
 repo-secret-manager -r /path/to/other/repo add "another-secret"
 repo-secret-manager -r /path/to/other/repo list
 ```
