@@ -4,8 +4,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vault from './vault';
 import { v4 as uuidv4 } from 'uuid';
-import * as replace from './replace';
-import { SecretData, SecretsMap } from './replace';
+import * as encrypt from './encrypt';
+import { SecretData, SecretsMap } from './encrypt';
 
 const program = new Command();
 
@@ -61,7 +61,7 @@ Examples:
   $ echo "mypassword" | rsm add "my_secret" "Database password"
   $ rsm add "api_key_123"  # Without description
   $ rsm -f ~/.vault-pass list
-  $ rsm -p mypassword replace
+  $ rsm -p mypassword encrypt
 `);
 
 program
@@ -201,8 +201,8 @@ program
   });
 
 program
-  .command('replace [path]')
-  .description('Replace secrets in files with placeholders (default: entire repo)')
+  .command('encrypt [path]')
+  .description('Encrypt secrets in files with placeholders (default: entire repo)')
   .action(async (targetPath: string | undefined, _options, command) => {
     try {
       const globalOpts = command.parent!.opts();
@@ -219,37 +219,37 @@ program
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       const secrets: SecretsMap = JSON.parse(decrypted);
-      let replacedFiles = 0;
+      let encryptedFiles = 0;
       
       const stats = fs.statSync(searchPath);
       if (stats.isFile()) {
-        if (replace.replaceSecretsInFile(searchPath, secrets)) {
-          console.log(`Replaced secrets in: ${searchPath}`);
-          replacedFiles++;
+        if (encrypt.encryptSecretsInFile(searchPath, secrets)) {
+          console.log(`Encrypted secrets in: ${searchPath}`);
+          encryptedFiles++;
         }
       } else {
-        replace.walkDir(searchPath, (filePath) => {
+        encrypt.walkDir(searchPath, (filePath) => {
           // Skip the secrets file itself
           if (filePath === secretsPath) return;
-          if (replace.replaceSecretsInFile(filePath, secrets)) {
-            console.log(`Replaced secrets in: ${filePath}`);
-            replacedFiles++;
+          if (encrypt.encryptSecretsInFile(filePath, secrets)) {
+            console.log(`Encrypted secrets in: ${filePath}`);
+            encryptedFiles++;
           }
         }, gitRoot);
       }
       
-      if (replacedFiles === 0) {
-        console.log('No secrets replaced.');
+      if (encryptedFiles === 0) {
+        console.log('No secrets encrypted.');
       }
     } catch (err) {
-      console.error('Error replacing secrets:', (err as Error).message);
+      console.error('Error encrypting secrets:', (err as Error).message);
       process.exit(1);
     }
   });
 
 program
-  .command('reverse [path]')
-  .description('Reverse placeholders back to secrets in files (default: entire repo)')
+  .command('decrypt [path]')
+  .description('Decrypt placeholders back to secrets in files (default: entire repo)')
   .action(async (targetPath: string | undefined, _options, command) => {
     try {
       const globalOpts = command.parent!.opts();
@@ -266,30 +266,30 @@ program
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       const secrets: SecretsMap = JSON.parse(decrypted);
-      let reversedFiles = 0;
+      let decryptedFiles = 0;
       
       const stats = fs.statSync(searchPath);
       if (stats.isFile()) {
-        if (replace.reverseSecretsInFile(searchPath, secrets)) {
-          console.log(`Reversed placeholders in: ${searchPath}`);
-          reversedFiles++;
+        if (encrypt.decryptSecretsInFile(searchPath, secrets)) {
+          console.log(`Decrypted placeholders in: ${searchPath}`);
+          decryptedFiles++;
         }
       } else {
-        replace.walkDir(searchPath, (filePath) => {
+        encrypt.walkDir(searchPath, (filePath) => {
           // Skip the secrets file itself
           if (filePath === secretsPath) return;
-          if (replace.reverseSecretsInFile(filePath, secrets)) {
-            console.log(`Reversed placeholders in: ${filePath}`);
-            reversedFiles++;
+          if (encrypt.decryptSecretsInFile(filePath, secrets)) {
+            console.log(`Decrypted placeholders in: ${filePath}`);
+            decryptedFiles++;
           }
         }, gitRoot);
       }
       
-      if (reversedFiles === 0) {
-        console.log('No placeholders reversed.');
+      if (decryptedFiles === 0) {
+        console.log('No placeholders decrypted.');
       }
     } catch (err) {
-      console.error('Error reversing placeholders:', (err as Error).message);
+      console.error('Error decrypting placeholders:', (err as Error).message);
       process.exit(1);
     }
   });

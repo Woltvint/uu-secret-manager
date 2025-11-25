@@ -55,14 +55,14 @@ export function walkDir(dir: string, callback: (filePath: string) => void, gitRo
 }
 
 /**
- * Replaces actual secrets in a file with UUID-based placeholders
+ * Encrypts actual secrets in a file with UUID-based placeholders
  * @param filePath - Path to the file to process
  * @param secrets - Map of UUIDs to secret data
- * @returns true if any replacements were made, false otherwise
+ * @returns true if any changes were made, false otherwise
  */
-export function replaceSecretsInFile(filePath: string, secrets: SecretsMap): boolean {
+export function encryptSecretsInFile(filePath: string, secrets: SecretsMap): boolean {
   let content = fs.readFileSync(filePath, 'utf8');
-  let replaced = false;
+  let changed = false;
   
   Object.entries(secrets).forEach(([uuid, data]) => {
     // Handle both old format (string) and new format (object)
@@ -71,11 +71,11 @@ export function replaceSecretsInFile(filePath: string, secrets: SecretsMap): boo
     
     if (content.includes(secret)) {
       content = content.split(secret).join(placeholder);
-      replaced = true;
+      changed = true;
     }
   });
   
-  if (replaced) {
+  if (changed) {
     fs.writeFileSync(filePath, content, 'utf8');
     return true;
   }
@@ -83,14 +83,14 @@ export function replaceSecretsInFile(filePath: string, secrets: SecretsMap): boo
 }
 
 /**
- * Reverses UUID-based placeholders back to actual secrets in a file
+ * Decrypts UUID-based placeholders back to actual secrets in a file
  * @param filePath - Path to the file to process
  * @param secrets - Map of UUIDs to secret data
- * @returns true if any replacements were made, false otherwise
+ * @returns true if any changes were made, false otherwise
  */
-export function reverseSecretsInFile(filePath: string, secrets: SecretsMap): boolean {
+export function decryptSecretsInFile(filePath: string, secrets: SecretsMap): boolean {
   let content = fs.readFileSync(filePath, 'utf8');
-  let replaced = false;
+  let changed = false;
   
   Object.entries(secrets).forEach(([uuid, data]) => {
     // Handle both old format (string) and new format (object)
@@ -99,11 +99,11 @@ export function reverseSecretsInFile(filePath: string, secrets: SecretsMap): boo
     
     if (content.includes(placeholder)) {
       content = content.split(placeholder).join(secret);
-      replaced = true;
+      changed = true;
     }
   });
   
-  if (replaced) {
+  if (changed) {
     fs.writeFileSync(filePath, content, 'utf8');
     return true;
   }

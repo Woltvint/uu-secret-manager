@@ -9,8 +9,8 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - List all stored secrets
 - Export secrets to CSV for backup or migration
 - Add new secrets with UUID-based placeholders
-- Replace secrets in files with placeholders (`<!secret_{uuid}!>`)
-- Reverse placeholders back to original secrets
+- Encrypt secrets in files with placeholders (`<!secret_{uuid}!>`)
+- Decrypt placeholders back to original secrets
 - Works exclusively with git repositories
 - Git pre-commit hook to prevent committing unencrypted secrets
 - **TypeScript** for enhanced type safety and developer experience
@@ -35,7 +35,7 @@ Examples:
 ```bash
 npx github:Woltvint/repo-secret-manager add "my-secret"
 npx github:Woltvint/repo-secret-manager list
-npx github:Woltvint/repo-secret-manager replace
+npx github:Woltvint/repo-secret-manager encrypt
 ```
 
 ### Install locally
@@ -128,38 +128,38 @@ npx github:Woltvint/repo-secret-manager export ./secrets-backup.csv
 
 The CSV file will contain columns: UUID, Secret, Description, Created, Placeholder
 
-### Replace Secrets in Files
+### Encrypt Secrets in Files
 
-Replace all secrets in files with their placeholders. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
+Encrypt all secrets in files with their placeholders. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
 
-**Note**: The replace command respects `.gitignore` and will skip files that are ignored by git.
+**Note**: The encrypt command respects `.gitignore` and will skip files that are ignored by git.
 
 ```bash
-# Replace in entire repository
-repo-secret-manager replace
+# Encrypt in entire repository
+repo-secret-manager encrypt
 
-# Replace in specific directory
-repo-secret-manager replace ./src
+# Encrypt in specific directory
+repo-secret-manager encrypt ./src
 
-# Replace in specific file
-repo-secret-manager replace ./config/database.yml
+# Encrypt in specific file
+repo-secret-manager encrypt ./config/database.yml
 ```
 
-### Reverse Placeholders to Secrets
+### Decrypt Placeholders to Secrets
 
 Restore all placeholders in files back to their original secret values. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
 
-**Note**: The reverse command respects `.gitignore` and will skip files that are ignored by git.
+**Note**: The decrypt command respects `.gitignore` and will skip files that are ignored by git.
 
 ```bash
-# Reverse in entire repository
-repo-secret-manager reverse
+# Decrypt in entire repository
+repo-secret-manager decrypt
 
-# Reverse in specific directory
-repo-secret-manager reverse ./src
+# Decrypt in specific directory
+repo-secret-manager decrypt ./src
 
-# Reverse in specific file
-repo-secret-manager reverse ./config/database.yml
+# Decrypt in specific file
+repo-secret-manager decrypt ./config/database.yml
 ```
 
 ## How It Works
@@ -168,8 +168,8 @@ repo-secret-manager reverse ./config/database.yml
 2. **Encryption**: Secrets are stored in `repo-secret-manager.json` at the repository root, encrypted with ansible-vault
 3. **Password Prompt**: The tool prompts for the vault password when accessing secrets
 4. **UUID Mapping**: Each secret is mapped to a UUID (e.g., `35f8756c-5cf3-455e-b843-b73fa87769c6`)
-5. **Placeholder Format**: Secrets are replaced with `<!secret_{uuid}!>` in files
-6. **File Processing**: The tool recursively walks directories and replaces secrets/placeholders in all files
+5. **Placeholder Format**: Secrets are encrypted with `<!secret_{uuid}!>` in files
+6. **File Processing**: The tool recursively walks directories and encrypts/decrypts secrets/placeholders in all files
 
 ## Security Notes
 
@@ -192,8 +192,8 @@ repo-secret-manager add "database-password-123"
 repo-secret-manager add "api-key-xyz"
 # Output: Secret added with placeholder: <!secret_def-456!>
 
-# 3. Replace secrets in your project files
-repo-secret-manager replace
+# 3. Encrypt secrets in your project files
+repo-secret-manager encrypt
 
 # 4. Your files now contain placeholders instead of secrets
 # Example: connection_string = "postgres://user:<!secret_abc-123!>@localhost/db"
@@ -203,7 +203,7 @@ git add .
 git commit -m "Use secret placeholders"
 
 # 6. To restore secrets (e.g., before deployment):
-repo-secret-manager reverse
+repo-secret-manager decrypt
 
 # 7. List all stored secrets
 repo-secret-manager list

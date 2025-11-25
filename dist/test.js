@@ -199,16 +199,16 @@ function cleanup() {
             }
         });
     });
-    (0, node_test_1.describe)('Replace and Reverse Operations', () => {
+    (0, node_test_1.describe)('Encrypt and Decrypt Operations', () => {
         let backupDir;
         (0, node_test_1.before)(() => {
             backupDir = path.join(TEST_REPO_DIR, 'backup');
             copyDir(TEST_REPO_DIR, backupDir);
         });
-        (0, node_test_1.test)('should replace secrets with placeholders', () => {
-            const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} replace`);
+        (0, node_test_1.test)('should encrypt secrets with placeholders', () => {
+            const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} encrypt`);
             if (output.includes('Error')) {
-                console.error('Replace command output:', output);
+                console.error('Encrypt command output:', output);
             }
             assert.ok(!output.includes('Error'), 'Should not have errors');
         });
@@ -234,10 +234,10 @@ function cleanup() {
             checkDir(TEST_REPO_DIR);
             assert.ok(foundPlaceholders, 'Should find placeholders in files');
         });
-        (0, node_test_1.test)('should reverse placeholders back to secrets', () => {
-            const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} reverse`);
+        (0, node_test_1.test)('should decrypt placeholders back to secrets', () => {
+            const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} decrypt`);
             if (output.includes('Error')) {
-                console.error('Reverse command output:', output);
+                console.error('Decrypt command output:', output);
             }
             assert.ok(!output.includes('Error'), 'Should not have errors');
         });
@@ -254,10 +254,10 @@ function cleanup() {
             fs.mkdirSync(ignoredDir);
             const ignoredDirFile = path.join(ignoredDir, 'file.txt');
             fs.writeFileSync(ignoredDirFile, `Another secret: ${testSecret}`);
-            // Run replace command
-            const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} replace`);
+            // Run encrypt command
+            const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} encrypt`);
             assert.ok(!output.includes('Error'), 'Should not have errors');
-            // Verify ignored files still contain the actual secret (not replaced)
+            // Verify ignored files still contain the actual secret (not encrypted)
             const ignoredContent = fs.readFileSync(ignoredFile, 'utf8');
             const ignoredDirContent = fs.readFileSync(ignoredDirFile, 'utf8');
             assert.ok(ignoredContent.includes(testSecret), 'Ignored file should still have actual secret');

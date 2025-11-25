@@ -195,7 +195,7 @@ describe('repo-secret-manager', () => {
     });
   });
 
-  describe('Replace and Reverse Operations', () => {
+  describe('Encrypt and Decrypt Operations', () => {
     let backupDir: string;
 
     before(() => {
@@ -203,10 +203,10 @@ describe('repo-secret-manager', () => {
       copyDir(TEST_REPO_DIR, backupDir);
     });
 
-    test('should replace secrets with placeholders', () => {
-      const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} replace`);
+    test('should encrypt secrets with placeholders', () => {
+      const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} encrypt`);
       if (output.includes('Error')) {
-        console.error('Replace command output:', output);
+        console.error('Encrypt command output:', output);
       }
       assert.ok(!output.includes('Error'), 'Should not have errors');
     });
@@ -234,10 +234,10 @@ describe('repo-secret-manager', () => {
       assert.ok(foundPlaceholders, 'Should find placeholders in files');
     });
 
-    test('should reverse placeholders back to secrets', () => {
-      const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} reverse`);
+    test('should decrypt placeholders back to secrets', () => {
+      const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} decrypt`);
       if (output.includes('Error')) {
-        console.error('Reverse command output:', output);
+        console.error('Decrypt command output:', output);
       }
       assert.ok(!output.includes('Error'), 'Should not have errors');
     });
@@ -258,11 +258,11 @@ describe('repo-secret-manager', () => {
       const ignoredDirFile = path.join(ignoredDir, 'file.txt');
       fs.writeFileSync(ignoredDirFile, `Another secret: ${testSecret}`);
       
-      // Run replace command
-      const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} replace`);
+      // Run encrypt command
+      const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} encrypt`);
       assert.ok(!output.includes('Error'), 'Should not have errors');
       
-      // Verify ignored files still contain the actual secret (not replaced)
+      // Verify ignored files still contain the actual secret (not encrypted)
       const ignoredContent = fs.readFileSync(ignoredFile, 'utf8');
       const ignoredDirContent = fs.readFileSync(ignoredDirFile, 'utf8');
       
