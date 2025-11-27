@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as vault from './vault';
 import { v4 as uuidv4 } from 'uuid';
 import * as encrypt from './encrypt';
-import { SecretData, SecretsMap } from './encrypt';
+import { SecretData, SecretsMap, SecretsStore } from './encrypt';
 
 const program = new Command();
 
@@ -74,7 +74,21 @@ program
       const secretsPath = getSecretsPath(repoPath);
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
-      const secrets: SecretsMap = JSON.parse(decrypted);
+      let store: SecretsStore;
+      let secrets: SecretsMap;
+      
+      try {
+        store = JSON.parse(decrypted);
+        // Handle old format without index
+        if (!store.secrets) {
+          secrets = store as any;
+        } else {
+          secrets = store.secrets;
+        }
+      } catch (err) {
+        console.error('Error: Could not parse secrets file');
+        process.exit(1);
+      }
       
       console.log('Secrets:');
       console.log('━'.repeat(80));
@@ -114,7 +128,21 @@ program
       const secretsPath = getSecretsPath(repoPath);
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
-      const secrets: SecretsMap = JSON.parse(decrypted);
+      let store: SecretsStore;
+      let secrets: SecretsMap;
+      
+      try {
+        store = JSON.parse(decrypted);
+        // Handle old format without index
+        if (!store.secrets) {
+          secrets = store as any;
+        } else {
+          secrets = store.secrets;
+        }
+      } catch (err) {
+        console.error('Error: Could not parse secrets file');
+        process.exit(1);
+      }
       
       // Build CSV content
       const csvLines: string[] = ['UUID,Secret,Description,Created,Placeholder'];
@@ -154,6 +182,61 @@ program
   });
 
 program
+  .command('index [path] [pattern]')
+  .description('Index files containing secrets for faster encrypt/decrypt operations')
+  .action(async (targetPath: string | undefined, pattern: string | undefined, _options, command) => {
+    try {
+      const globalOpts = command.parent!.opts();
+      const repoPath = globalOpts.repo;
+      const gitRoot = findGitRoot(repoPath);
+      if (!gitRoot) {
+        console.error('Error: Not in a git repository');
+        process.exit(1);
+      }
+      
+      const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
+      const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+      
+      const password = await vault.getPassword(globalOpts);
+      const decrypted = await vault.decryptVaultFile(secretsPath, password);
+      let store: SecretsStore;
+      
+      try {
+        store = JSON.parse(decrypted);
+        // Handle old format without index
+        if (!store.secrets) {
+          store = { secrets: store as any, index: [] };
+        }
+      } catch (err) {
+        console.error('Error: Could not parse secrets file');
+        process.exit(1);
+      }
+      
+      console.log('Indexing files...');
+      if (pattern) {
+        console.log(`Pattern: ${pattern}`);
+      }
+      
+      const indexedFiles = encrypt.indexFiles(searchPath, store.secrets, pattern, gitRoot);
+      store.index = indexedFiles;
+      
+      await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
+      
+      console.log(`\nIndexed ${indexedFiles.length} files containing secrets`);
+      if (indexedFiles.length > 0) {
+        console.log('\nFiles indexed:');
+        indexedFiles.forEach(f => {
+          const relPath = path.relative(gitRoot, f.path);
+          console.log(`  ${relPath} (${f.secretIds.length} secret(s))`);
+        });
+      }
+    } catch (err) {
+      console.error('Error indexing files:', (err as Error).message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('add <secret> [description]')
   .description('Add a secret to the store with optional description')
   .action(async (secret: string, description: string | undefined, _options, command) => {
@@ -162,18 +245,22 @@ program
       const repoPath = globalOpts.repo;
       const secretsPath = getSecretsPath(repoPath);
       const password = await vault.getPassword(globalOpts);
-      let secrets: SecretsMap = {};
+      let store: SecretsStore = { secrets: {}, index: undefined };
       
       try {
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
-        secrets = JSON.parse(decrypted);
+        store = JSON.parse(decrypted);
+        // Handle old format without index
+        if (!store.secrets) {
+          store = { secrets: store as any, index: undefined };
+        }
       } catch (err) {
         // If file doesn't exist or is empty, start fresh
-        secrets = {};
+        store = { secrets: {}, index: undefined };
       }
       
       // Check for duplicate secret
-      for (const [existingUuid, data] of Object.entries(secrets)) {
+      for (const [existingUuid, data] of Object.entries(store.secrets)) {
         const existingSecret = typeof data === 'string' ? data : data.secret;
         if (existingSecret === secret) {
           console.error(`Error: Secret already exists with UUID: ${existingUuid}`);
@@ -183,13 +270,13 @@ program
       }
       
       const uuid = uuidv4();
-      secrets[uuid] = {
+      store.secrets[uuid] = {
         secret: secret,
         description: description || '',
         created: new Date().toISOString()
       };
       
-      await vault.encryptVaultFile(secretsPath, password, JSON.stringify(secrets, null, 2));
+      await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
       console.log(`Secret added with placeholder: <!secret_${uuid}!>`);
       if (description) {
         console.log(`Description: ${description}`);
@@ -218,24 +305,58 @@ program
       
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
-      const secrets: SecretsMap = JSON.parse(decrypted);
+      let store: SecretsStore;
+      let secrets: SecretsMap;
+      
+      try {
+        store = JSON.parse(decrypted);
+        // Handle old format without index
+        if (!store.secrets) {
+          secrets = store as any;
+          store = { secrets, index: undefined };
+        } else {
+          secrets = store.secrets;
+        }
+      } catch (err) {
+        console.error('Error: Could not parse secrets file');
+        process.exit(1);
+      }
+      
       let encryptedFiles = 0;
       
-      const stats = fs.statSync(searchPath);
-      if (stats.isFile()) {
-        if (encrypt.encryptSecretsInFile(searchPath, secrets)) {
-          console.log(`Encrypted secrets in: ${searchPath}`);
-          encryptedFiles++;
-        }
+      // Use index if available and no specific path given
+      if (store.index && store.index.length > 0 && !targetPath) {
+        console.log(`Using index (${store.index.length} files)...`);
+        store.index.forEach(indexedFile => {
+          if (fs.existsSync(indexedFile.path)) {
+            if (encrypt.encryptSecretsInFile(indexedFile.path, secrets)) {
+              console.log(`Encrypted secrets in: ${indexedFile.path}`);
+              encryptedFiles++;
+            }
+          }
+        });
       } else {
-        encrypt.walkDir(searchPath, (filePath) => {
-          // Skip the secrets file itself
-          if (filePath === secretsPath) return;
-          if (encrypt.encryptSecretsInFile(filePath, secrets)) {
-            console.log(`Encrypted secrets in: ${filePath}`);
+        // Fall back to scanning all files
+        if (store.index && !targetPath) {
+          console.log('No index found. Run "index" command first for faster operation.');
+        }
+        
+        const stats = fs.statSync(searchPath);
+        if (stats.isFile()) {
+          if (encrypt.encryptSecretsInFile(searchPath, secrets)) {
+            console.log(`Encrypted secrets in: ${searchPath}`);
             encryptedFiles++;
           }
-        }, gitRoot);
+        } else {
+          encrypt.walkDir(searchPath, (filePath) => {
+            // Skip the secrets file itself
+            if (filePath === secretsPath) return;
+            if (encrypt.encryptSecretsInFile(filePath, secrets)) {
+              console.log(`Encrypted secrets in: ${filePath}`);
+              encryptedFiles++;
+            }
+          }, gitRoot);
+        }
       }
       
       if (encryptedFiles === 0) {
@@ -265,24 +386,58 @@ program
       
       const password = await vault.getPassword(globalOpts);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
-      const secrets: SecretsMap = JSON.parse(decrypted);
+      let store: SecretsStore;
+      let secrets: SecretsMap;
+      
+      try {
+        store = JSON.parse(decrypted);
+        // Handle old format without index
+        if (!store.secrets) {
+          secrets = store as any;
+          store = { secrets, index: undefined };
+        } else {
+          secrets = store.secrets;
+        }
+      } catch (err) {
+        console.error('Error: Could not parse secrets file');
+        process.exit(1);
+      }
+      
       let decryptedFiles = 0;
       
-      const stats = fs.statSync(searchPath);
-      if (stats.isFile()) {
-        if (encrypt.decryptSecretsInFile(searchPath, secrets)) {
-          console.log(`Decrypted placeholders in: ${searchPath}`);
-          decryptedFiles++;
-        }
+      // Use index if available and no specific path given
+      if (store.index && store.index.length > 0 && !targetPath) {
+        console.log(`Using index (${store.index.length} files)...`);
+        store.index.forEach(indexedFile => {
+          if (fs.existsSync(indexedFile.path)) {
+            if (encrypt.decryptSecretsInFile(indexedFile.path, secrets)) {
+              console.log(`Decrypted placeholders in: ${indexedFile.path}`);
+              decryptedFiles++;
+            }
+          }
+        });
       } else {
-        encrypt.walkDir(searchPath, (filePath) => {
-          // Skip the secrets file itself
-          if (filePath === secretsPath) return;
-          if (encrypt.decryptSecretsInFile(filePath, secrets)) {
-            console.log(`Decrypted placeholders in: ${filePath}`);
+        // Fall back to scanning all files
+        if (store.index && !targetPath) {
+          console.log('No index found. Run "index" command first for faster operation.');
+        }
+        
+        const stats = fs.statSync(searchPath);
+        if (stats.isFile()) {
+          if (encrypt.decryptSecretsInFile(searchPath, secrets)) {
+            console.log(`Decrypted placeholders in: ${searchPath}`);
             decryptedFiles++;
           }
-        }, gitRoot);
+        } else {
+          encrypt.walkDir(searchPath, (filePath) => {
+            // Skip the secrets file itself
+            if (filePath === secretsPath) return;
+            if (encrypt.decryptSecretsInFile(filePath, secrets)) {
+              console.log(`Decrypted placeholders in: ${filePath}`);
+              decryptedFiles++;
+            }
+          }, gitRoot);
+        }
       }
       
       if (decryptedFiles === 0) {

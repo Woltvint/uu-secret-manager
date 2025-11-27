@@ -33,13 +33,38 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.matchesPattern = matchesPattern;
 exports.isGitIgnored = isGitIgnored;
 exports.walkDir = walkDir;
 exports.encryptSecretsInFile = encryptSecretsInFile;
 exports.decryptSecretsInFile = decryptSecretsInFile;
+exports.indexFiles = indexFiles;
+exports.encryptIndexedFiles = encryptIndexedFiles;
+exports.decryptIndexedFiles = decryptIndexedFiles;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const child_process_1 = require("child_process");
+/**
+ * Checks if a file path matches a glob pattern
+ * @param filePath - Path to check
+ * @param pattern - Glob pattern (e.g., "*.js" or "(*.js|*.json)")
+ * @returns true if the file matches the pattern
+ */
+function matchesPattern(filePath, pattern) {
+    const fileName = path.basename(filePath);
+    // Handle parentheses for multiple patterns: (*.js|*.json)
+    if (pattern.startsWith('(') && pattern.endsWith(')')) {
+        const patterns = pattern.slice(1, -1).split('|');
+        return patterns.some(p => matchesPattern(filePath, p.trim()));
+    }
+    // Convert glob pattern to regex
+    const regexPattern = pattern
+        .replace(/\./g, '\\.')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(fileName);
+}
 /**
  * Checks if a file is ignored by git
  * @param filePath - Path to the file to check
@@ -129,5 +154,85 @@ function decryptSecretsInFile(filePath, secrets) {
         return true;
     }
     return false;
+}
+/**
+ * Indexes files containing secrets
+ * @param searchPath - Path to search for files
+ * @param secrets - Map of UUIDs to secret data
+ * @param pattern - Optional glob pattern to filter files (e.g., "*.js" or "(*.js|*.json)")
+ * @param gitRoot - Optional git root to respect .gitignore
+ * @returns Array of indexed files with their secret IDs
+ */
+function indexFiles(searchPath, secrets, pattern, gitRoot) {
+    const indexedFiles = [];
+    const processFile = (filePath) => {
+        // Apply pattern filter if provided
+        if (pattern && !matchesPattern(filePath, pattern)) {
+            return;
+        }
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const secretIds = [];
+            // Check which secrets are in this file
+            Object.entries(secrets).forEach(([uuid, data]) => {
+                const secret = typeof data === 'string' ? data : data.secret;
+                if (content.includes(secret)) {
+                    secretIds.push(uuid);
+                }
+            });
+            // Only index files that contain secrets
+            if (secretIds.length > 0) {
+                indexedFiles.push({
+                    path: filePath,
+                    secretIds
+                });
+            }
+        }
+        catch (err) {
+            // Skip files that can't be read (binary, permission issues, etc.)
+        }
+    };
+    const stats = fs.statSync(searchPath);
+    if (stats.isFile()) {
+        processFile(searchPath);
+    }
+    else {
+        walkDir(searchPath, processFile, gitRoot);
+    }
+    return indexedFiles;
+}
+/**
+ * Encrypts secrets only in indexed files
+ * @param indexedFiles - Array of indexed files to process
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Number of files that were encrypted
+ */
+function encryptIndexedFiles(indexedFiles, secrets) {
+    let encryptedCount = 0;
+    for (const indexedFile of indexedFiles) {
+        if (fs.existsSync(indexedFile.path)) {
+            if (encryptSecretsInFile(indexedFile.path, secrets)) {
+                encryptedCount++;
+            }
+        }
+    }
+    return encryptedCount;
+}
+/**
+ * Decrypts secrets only in indexed files
+ * @param indexedFiles - Array of indexed files to process
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Number of files that were decrypted
+ */
+function decryptIndexedFiles(indexedFiles, secrets) {
+    let decryptedCount = 0;
+    for (const indexedFile of indexedFiles) {
+        if (fs.existsSync(indexedFile.path)) {
+            if (decryptSecretsInFile(indexedFile.path, secrets)) {
+                decryptedCount++;
+            }
+        }
+    }
+    return decryptedCount;
 }
 //# sourceMappingURL=encrypt.js.map

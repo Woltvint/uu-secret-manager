@@ -9,8 +9,10 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - List all stored secrets
 - Export secrets to CSV for backup or migration
 - Add new secrets with UUID-based placeholders
+- **Index files** for dramatically faster encrypt/decrypt operations
 - Encrypt secrets in files with placeholders (`<!secret_{uuid}!>`)
 - Decrypt placeholders back to original secrets
+- Filter indexing by file patterns (e.g., `*.js`, `(*.js|*.json)`)
 - Works exclusively with git repositories
 - Git pre-commit hook to prevent committing unencrypted secrets
 - **TypeScript** for enhanced type safety and developer experience
@@ -128,14 +130,34 @@ npx github:Woltvint/repo-secret-manager export ./secrets-backup.csv
 
 The CSV file will contain columns: UUID, Secret, Description, Created, Placeholder
 
+### Index Files for Faster Operations
+
+Index files containing secrets to dramatically speed up encrypt/decrypt operations. The index stores which files contain secrets, so subsequent encrypt/decrypt commands only process those files instead of scanning the entire repository.
+
+```bash
+# Index all files in repository
+repo-secret-manager index
+
+# Index only JavaScript files
+repo-secret-manager index . "*.js"
+
+# Index multiple file types
+repo-secret-manager index . "(*.js|*.json|*.yml)"
+
+# Index specific directory
+repo-secret-manager index ./src "*.ts"
+```
+
+**Performance**: After indexing, encrypt/decrypt operations only process indexed files, making them significantly faster for large repositories.
+
 ### Encrypt Secrets in Files
 
 Encrypt all secrets in files with their placeholders. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
 
-**Note**: The encrypt command respects `.gitignore` and will skip files that are ignored by git.
+**Note**: The encrypt command respects `.gitignore` and will skip files that are ignored by git. If an index exists, it will use the indexed files for faster operation.
 
 ```bash
-# Encrypt in entire repository
+# Encrypt in entire repository (uses index if available)
 repo-secret-manager encrypt
 
 # Encrypt in specific directory
@@ -149,10 +171,10 @@ repo-secret-manager encrypt ./config/database.yml
 
 Restore all placeholders in files back to their original secret values. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
 
-**Note**: The decrypt command respects `.gitignore` and will skip files that are ignored by git.
+**Note**: The decrypt command respects `.gitignore` and will skip files that are ignored by git. If an index exists, it will use the indexed files for faster operation.
 
 ```bash
-# Decrypt in entire repository
+# Decrypt in entire repository (uses index if available)
 repo-secret-manager decrypt
 
 # Decrypt in specific directory
@@ -192,26 +214,29 @@ repo-secret-manager add "database-password-123"
 repo-secret-manager add "api-key-xyz"
 # Output: Secret added with placeholder: <!secret_def-456!>
 
-# 3. Encrypt secrets in your project files
+# 3. Index files for faster operations (optional but recommended)
+repo-secret-manager index . "(*.js|*.json|*.yml)"
+
+# 4. Encrypt secrets in your project files
 repo-secret-manager encrypt
 
-# 4. Your files now contain placeholders instead of secrets
+# 5. Your files now contain placeholders instead of secrets
 # Example: connection_string = "postgres://user:<!secret_abc-123!>@localhost/db"
 
-# 5. Commit the files with placeholders (safe!)
+# 6. Commit the files with placeholders (safe!)
 git add .
 git commit -m "Use secret placeholders"
 
-# 6. To restore secrets (e.g., before deployment):
+# 7. To restore secrets (e.g., before deployment):
 repo-secret-manager decrypt
 
-# 7. List all stored secrets
+# 8. List all stored secrets
 repo-secret-manager list
 
-# 8. Export secrets to CSV for backup
+# 9. Export secrets to CSV for backup
 repo-secret-manager export ./secrets-backup.csv
 
-# 9. Work with a different repository
+# 10. Work with a different repository
 repo-secret-manager -r /path/to/other/repo add "another-secret"
 repo-secret-manager -r /path/to/other/repo list
 ```

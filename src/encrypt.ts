@@ -8,7 +8,42 @@ export interface SecretData {
   created?: string;
 }
 
+export interface IndexedFile {
+  path: string;
+  secretIds: string[];  // UUIDs of secrets found in this file
+}
+
+export interface SecretsStore {
+  secrets: SecretsMap;
+  index?: IndexedFile[];
+}
+
 export type SecretsMap = Record<string, SecretData | string>;
+
+/**
+ * Checks if a file path matches a glob pattern
+ * @param filePath - Path to check
+ * @param pattern - Glob pattern (e.g., "*.js" or "(*.js|*.json)")
+ * @returns true if the file matches the pattern
+ */
+export function matchesPattern(filePath: string, pattern: string): boolean {
+  const fileName = path.basename(filePath);
+  
+  // Handle parentheses for multiple patterns: (*.js|*.json)
+  if (pattern.startsWith('(') && pattern.endsWith(')')) {
+    const patterns = pattern.slice(1, -1).split('|');
+    return patterns.some(p => matchesPattern(filePath, p.trim()));
+  }
+  
+  // Convert glob pattern to regex
+  const regexPattern = pattern
+    .replace(/\./g, '\\.')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  
+  const regex = new RegExp(`^${regexPattern}$`);
+  return regex.test(fileName);
+}
 
 /**
  * Checks if a file is ignored by git
@@ -108,4 +143,100 @@ export function decryptSecretsInFile(filePath: string, secrets: SecretsMap): boo
     return true;
   }
   return false;
+}
+
+/**
+ * Indexes files containing secrets
+ * @param searchPath - Path to search for files
+ * @param secrets - Map of UUIDs to secret data
+ * @param pattern - Optional glob pattern to filter files (e.g., "*.js" or "(*.js|*.json)")
+ * @param gitRoot - Optional git root to respect .gitignore
+ * @returns Array of indexed files with their secret IDs
+ */
+export function indexFiles(
+  searchPath: string,
+  secrets: SecretsMap,
+  pattern?: string,
+  gitRoot?: string
+): IndexedFile[] {
+  const indexedFiles: IndexedFile[] = [];
+  
+  const processFile = (filePath: string) => {
+    // Apply pattern filter if provided
+    if (pattern && !matchesPattern(filePath, pattern)) {
+      return;
+    }
+    
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const secretIds: string[] = [];
+      
+      // Check which secrets are in this file
+      Object.entries(secrets).forEach(([uuid, data]) => {
+        const secret = typeof data === 'string' ? data : data.secret;
+        if (content.includes(secret)) {
+          secretIds.push(uuid);
+        }
+      });
+      
+      // Only index files that contain secrets
+      if (secretIds.length > 0) {
+        indexedFiles.push({
+          path: filePath,
+          secretIds
+        });
+      }
+    } catch (err) {
+      // Skip files that can't be read (binary, permission issues, etc.)
+    }
+  };
+  
+  const stats = fs.statSync(searchPath);
+  if (stats.isFile()) {
+    processFile(searchPath);
+  } else {
+    walkDir(searchPath, processFile, gitRoot);
+  }
+  
+  return indexedFiles;
+}
+
+/**
+ * Encrypts secrets only in indexed files
+ * @param indexedFiles - Array of indexed files to process
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Number of files that were encrypted
+ */
+export function encryptIndexedFiles(indexedFiles: IndexedFile[], secrets: SecretsMap): number {
+  let encryptedCount = 0;
+  
+  for (const indexedFile of indexedFiles) {
+    if (fs.existsSync(indexedFile.path)) {
+      if (encryptSecretsInFile(indexedFile.path, secrets)) {
+        encryptedCount++;
+      }
+    }
+  }
+  
+  return encryptedCount;
+}
+
+/**
+ * Decrypts secrets only in indexed files
+ * @param indexedFiles - Array of indexed files to process
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Number of files that were decrypted
+ */
+export function decryptIndexedFiles(indexedFiles: IndexedFile[], secrets: SecretsMap): number {
+  let decryptedCount = 0;
+  
+  for (const indexedFile of indexedFiles) {
+    if (fs.existsSync(indexedFile.path)) {
+      if (decryptSecretsInFile(indexedFile.path, secrets)) {
+        decryptedCount++;
+      }
+    }
+  }
+  
+  return decryptedCount;
 }
