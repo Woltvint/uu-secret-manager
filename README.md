@@ -159,7 +159,7 @@ repo-secret-manager index ./src --all
 
 **Performance**: After indexing, encrypt/decrypt operations only process indexed files, making them significantly faster for large repositories.
 
-**Incremental Updates**: The default git-modified behavior makes it easy to keep your index up-to-date by only re-indexing files that have changed.
+**Incremental Updates**: The default git-modified behavior makes it easy to keep your index up-to-date by only re-indexing files that have changed. When using git-modified mode, the tool merges results with the existing index, preserving entries for files that haven't been modified. Use `--all` to completely rebuild the index from scratch.
 
 ### Encrypt Secrets in Files
 

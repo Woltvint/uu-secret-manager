@@ -394,6 +394,41 @@ describe('repo-secret-manager', () => {
       assert.ok(output.includes('No git-modified files found') || output.includes('Indexed 0 files'), 
         'Should handle no modified files gracefully');
     });
+
+    test('should preserve existing index entries when indexing git-modified', () => {
+      // First, index all files
+      execCommand('git add .', TEST_REPO_DIR);
+      execCommand('git commit -m "Initial" || true', TEST_REPO_DIR);
+      
+      const file1 = path.join(TEST_REPO_DIR, 'file1.txt');
+      const file2 = path.join(TEST_REPO_DIR, 'file2.txt');
+      const testSecret = secrets[0];
+      
+      fs.writeFileSync(file1, `Secret: ${testSecret}`);
+      fs.writeFileSync(file2, `Secret: ${testSecret}`);
+      
+      execCommand('git add .', TEST_REPO_DIR);
+      execCommand('git commit -m "Add files"', TEST_REPO_DIR);
+      
+      // Index all files
+      const output1 = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} index --all`);
+      assert.ok(output1.includes('file1.txt') && output1.includes('file2.txt'), 
+        'Should index both files initially');
+      
+      // Now modify only file1
+      fs.appendFileSync(file1, '\n// Modified');
+      
+      // Index with git-modified (default)
+      const output2 = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} index`);
+      
+      // Verify file2 is still in the index
+      assert.ok(output2.includes('file1.txt'), 'Should include modified file1');
+      assert.ok(output2.includes('file2.txt'), 'Should preserve unmodified file2 in index');
+      
+      // Cleanup
+      if (fs.existsSync(file1)) fs.unlinkSync(file1);
+      if (fs.existsSync(file2)) fs.unlinkSync(file2);
+    });
   });
 
   describe('Git Hook', () => {

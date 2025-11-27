@@ -245,13 +245,33 @@ program
         else {
             console.log('Mode: Indexing all files');
         }
-        const indexedFiles = encrypt.indexFiles(searchPath, store.secrets, pattern, gitRoot, specificFiles);
-        store.index = indexedFiles;
+        const newIndexedFiles = encrypt.indexFiles(searchPath, store.secrets, pattern, gitRoot, specificFiles);
+        // Merge with existing index when using git-modified mode
+        if (!cmdOptions.all && store.index && store.index.length > 0) {
+            // Create a map of existing indexed files by path
+            const existingMap = new Map(store.index.map(f => [f.path, f]));
+            // Update or add new indexed files
+            newIndexedFiles.forEach(newFile => {
+                existingMap.set(newFile.path, newFile);
+            });
+            // Remove files that no longer exist
+            const finalIndex = [];
+            existingMap.forEach((file, filePath) => {
+                if (fs.existsSync(filePath)) {
+                    finalIndex.push(file);
+                }
+            });
+            store.index = finalIndex;
+        }
+        else {
+            // Replace entire index when using --all or when no existing index
+            store.index = newIndexedFiles;
+        }
         await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
-        console.log(`\nIndexed ${indexedFiles.length} files containing secrets`);
-        if (indexedFiles.length > 0) {
+        console.log(`\nIndexed ${store.index.length} files containing secrets`);
+        if (store.index.length > 0) {
             console.log('\nFiles indexed:');
-            indexedFiles.forEach(f => {
+            store.index.forEach((f) => {
                 const relPath = path.relative(gitRoot, f.path);
                 console.log(`  ${relPath} (${f.secretIds.length} secret(s))`);
             });
