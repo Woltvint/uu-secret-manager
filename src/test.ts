@@ -146,7 +146,7 @@ describe('repo-secret-manager', () => {
         assert.ok(!output.includes('Error'), 'Should not have errors');
       }
       
-      const secretsFile = path.join(TEST_REPO_DIR, 'repo-secret-manager.json');
+      const secretsFile = path.join(TEST_REPO_DIR, 'repo-secret-manager.vault');
       assert.ok(fs.existsSync(secretsFile), 'Secrets file should exist');
     });
 

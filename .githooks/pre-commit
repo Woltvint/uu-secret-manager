@@ -11,7 +11,7 @@ const GREEN = '\x1b[32m';
 const RESET = '\x1b[0m';
 
 // Check if secrets file exists
-const secretsPath = 'repo-secret-manager.json';
+const secretsPath = 'repo-secret-manager.vault';
 if (!fs.existsSync(secretsPath)) {
   // No secrets file, skip check
   process.exit(0);

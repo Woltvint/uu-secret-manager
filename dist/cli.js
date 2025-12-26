@@ -70,7 +70,7 @@ function getSecretsPath(repoPath) {
         console.error('Initialize a git repo with: git init');
         process.exit(1);
     }
-    return path.join(gitRoot, 'repo-secret-manager.json');
+    return path.join(gitRoot, 'repo-secret-manager.vault');
 }
 program
     .name('repo-secret-manager')
@@ -223,7 +223,7 @@ program
             process.exit(1);
         }
         const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
-        const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
         const password = await vault.getPassword(globalOpts);
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
         let store;
@@ -524,7 +524,7 @@ program
             process.exit(1);
         }
         const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
-        const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
         const password = await vault.getPassword(globalOpts);
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
         let store;
@@ -547,7 +547,7 @@ program
         let encryptedFiles = 0;
         // Use index if available and no specific path given
         if (store.index && store.index.length > 0 && !targetPath) {
-            console.log(`Using index (${store.index.length} files)...`);
+            console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
             store.index.forEach(indexedFile => {
                 if (fs.existsSync(indexedFile.path)) {
                     if (encrypt.encryptSecretsInFile(indexedFile.path, secrets)) {
@@ -560,7 +560,14 @@ program
         else {
             // Fall back to scanning all files
             if (store.index && !targetPath) {
-                console.log('No index found. Run "index" command first for faster operation.');
+                console.log('No index found. Performing full directory scan...');
+                console.log('Tip: Run "index" command first for faster operation.');
+            }
+            else if (!store.index) {
+                console.log('Performing full directory scan (no index available)...');
+            }
+            else {
+                console.log('Performing full directory scan (specific path provided)...');
             }
             const stats = fs.statSync(searchPath);
             if (stats.isFile()) {
@@ -603,7 +610,7 @@ program
             process.exit(1);
         }
         const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
-        const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
         const password = await vault.getPassword(globalOpts);
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
         let store;
@@ -683,7 +690,7 @@ program
             process.exit(1);
         }
         const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
-        const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
         const password = await vault.getPassword(globalOpts);
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
         let store;
@@ -707,7 +714,7 @@ program
         let gitignoreUpdated = false;
         // Use index if available and no specific path given
         if (store.index && store.index.length > 0 && !targetPath) {
-            console.log(`Using index (${store.index.length} files)...`);
+            console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
             store.index.forEach(indexedFile => {
                 if (fs.existsSync(indexedFile.path)) {
                     // Skip if already a redacted file
@@ -731,7 +738,14 @@ program
         else {
             // Fall back to scanning all files
             if (store.index && !targetPath) {
-                console.log('No index found. Run "index" command first for faster operation.');
+                console.log('No index found. Performing full directory scan...');
+                console.log('Tip: Run "index" command first for faster operation.');
+            }
+            else if (!store.index) {
+                console.log('Performing full directory scan (no index available)...');
+            }
+            else {
+                console.log('Performing full directory scan (specific path provided)...');
             }
             const stats = fs.statSync(searchPath);
             if (stats.isFile()) {
@@ -798,7 +812,7 @@ program
             process.exit(1);
         }
         const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
-        const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
         const password = await vault.getPassword(globalOpts);
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
         let store;

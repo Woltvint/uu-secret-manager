@@ -94,7 +94,7 @@ All commands work from anywhere within your git repository. The tool automatical
 ### Add a Secret
 
 Add a new secret to the encrypted store. You can optionally provide a custom name for the placeholder, otherwise a UUID will be auto-generated.
-The secrets file will be created in the root of your git repository as `repo-secret-manager.json`.
+The secrets file will be created in the root of your git repository as `repo-secret-manager.vault`.
 
 **Syntax:**
 - `add <secret>` - Add secret with auto-generated UUID placeholder (backward compatible)
@@ -326,7 +326,7 @@ repo-secret-manager unredact ./config.redacted.json
 ## How It Works
 
 1. **Git Repository**: The tool finds the root of your git repository automatically
-2. **Encryption**: Secrets are stored in `repo-secret-manager.json` at the repository root, encrypted with ansible-vault
+2. **Encryption**: Secrets are stored in `repo-secret-manager.vault` at the repository root, encrypted with ansible-vault
 3. **Password Prompt**: The tool prompts for the vault password when accessing secrets
 4. **Secret Mapping**: Each secret is mapped to a UUID internally, but can optionally have a custom name for the placeholder
 5. **Placeholder Format**: Secrets are encrypted with placeholders in files:
@@ -337,9 +337,9 @@ repo-secret-manager unredact ./config.redacted.json
 ## Security Notes
 
 - The secrets file remains encrypted on disk at all times
-- The secrets file is stored at the repository root as `repo-secret-manager.json`
-- The vault password is prompted each time the tool runs
-- Add `repo-secret-manager.json` to `.gitignore` if you don't want to commit it (though it's encrypted)
+- The secrets file is stored at the repository root as `repo-secret-manager.vault`
+- The vault password is prompted each time the tool runs (input is hidden for security)
+- Add `repo-secret-manager.vault` to `.gitignore` if you don't want to commit it (though it's encrypted)
 - Use the pre-commit hook to prevent accidentally committing unencrypted secrets
 
 ## Example Workflow

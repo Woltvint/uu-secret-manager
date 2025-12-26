@@ -163,7 +163,7 @@ function cleanup() {
                 const output = execCommandWithPassword(`node ${CLI_PATH} -r ${TEST_REPO_DIR} add "${secret}"`);
                 assert.ok(!output.includes('Error'), 'Should not have errors');
             }
-            const secretsFile = path.join(TEST_REPO_DIR, 'repo-secret-manager.json');
+            const secretsFile = path.join(TEST_REPO_DIR, 'repo-secret-manager.vault');
             assert.ok(fs.existsSync(secretsFile), 'Secrets file should exist');
         });
         (0, node_test_1.test)('should list all secrets', () => {

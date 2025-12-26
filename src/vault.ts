@@ -8,21 +8,49 @@ export interface VaultOptions {
 }
 
 /**
- * Prompts the user for a password input
+ * Prompts the user for a password input with hidden characters
  * @param question - The question to display to the user
  * @returns Promise resolving to the entered password
  */
 function promptPassword(question: string): Promise<string> {
   return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      terminal: true
-    });
-    rl.question(question, (password: string) => {
-      rl.close();
-      resolve(password);
-    });
+    const stdin = process.stdin;
+    const stdout = process.stdout;
+    
+    stdout.write(question);
+    
+    // Hide input by not echoing characters
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    
+    let password = '';
+    
+    const onData = (char: string) => {
+      // Handle special characters
+      if (char === '\u0003') { // Ctrl+C
+        stdin.setRawMode(false);
+        stdin.pause();
+        stdin.removeListener('data', onData);
+        process.exit(1);
+      } else if (char === '\r' || char === '\n') { // Enter
+        stdin.setRawMode(false);
+        stdin.pause();
+        stdin.removeListener('data', onData);
+        stdout.write('\n');
+        resolve(password);
+      } else if (char === '\u007f' || char === '\b') { // Backspace
+        if (password.length > 0) {
+          password = password.slice(0, -1);
+          stdout.write('\b \b');
+        }
+      } else {
+        password += char;
+        stdout.write('*');
+      }
+    };
+    
+    stdin.on('data', onData);
   });
 }
 
