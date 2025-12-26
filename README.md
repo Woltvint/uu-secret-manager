@@ -11,15 +11,19 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Add new secrets with UUID-based or custom-named placeholders
 - Modify existing secrets by their custom name
 - Delete secrets by their custom name or UUID
-- **Index files** for dramatically faster encrypt/decrypt operations
+- **Index files** for dramatically faster encrypt/decrypt operations (includes `.gitignore` files)
 - Encrypt secrets in files with placeholders (`<!secret_{uuid}!>` or `<!secret_{name}!>`) - in-place replacement
 - Decrypt placeholders back to original secrets - in-place replacement
 - Redact secrets by creating separate files with `.redacted` suffix (e.g., `file.json` -> `file.redacted.json`)
 - Unredact redacted files to restore original files with real values
+- Automatic `.gitignore` management for redacted files
+- Clear index to rebuild from scratch
 - Filter indexing by file patterns (e.g., `*.js`, `(*.js|*.json)`)
+- `--noindex` option to force full directory scan on encrypt/decrypt/redact/unredact
 - Works exclusively with git repositories
 - Git pre-commit hook to prevent committing unencrypted secrets
 - **TypeScript** for enhanced type safety and developer experience
+- **Hidden password input** for secure password entry
 
 ## Prerequisites
 
@@ -203,7 +207,7 @@ The CSV file will contain columns: UUID, Name, Secret, Description, Created, Pla
 
 Index files containing secrets to dramatically speed up encrypt/decrypt operations. The index stores which files contain secrets, so subsequent encrypt/decrypt commands only process those files instead of scanning the entire repository.
 
-**Default Behavior**: By default, the index command only indexes git-modified files (staged and unstaged changes) and files listed in `.gitignore`. This makes it fast and efficient for incremental updates. Use `--all` to index all files in the repository.
+**Default Behavior**: By default, the index command indexes git-modified files (staged and unstaged changes) and files listed in `.gitignore` (exact file paths only, not patterns). This makes it fast and efficient for incremental updates. Use `--all` to index all files in the repository.
 
 ```bash
 # Index git-modified and .gitignore files (default - fast incremental update)
@@ -245,6 +249,9 @@ Encrypt all secrets in files with their placeholders. You can specify a path (fi
 
 **Note**: The encrypt command respects `.gitignore` and will skip files that are ignored by git. If an index exists, it will use the indexed files for faster operation.
 
+**Options**:
+- `--noindex`: Do not use index, perform full directory scan
+
 ```bash
 # Encrypt in entire repository (uses index if available)
 repo-secret-manager encrypt
@@ -254,6 +261,9 @@ repo-secret-manager encrypt ./src
 
 # Encrypt in specific file
 repo-secret-manager encrypt ./config/database.yml
+
+# Force full directory scan (ignore index)
+repo-secret-manager encrypt --noindex
 ```
 
 ### Decrypt Placeholders to Secrets
@@ -261,6 +271,9 @@ repo-secret-manager encrypt ./config/database.yml
 Restore all placeholders in files back to their original secret values. You can specify a path (file or directory) within your repo, or omit it to process the entire repository.
 
 **Note**: The decrypt command respects `.gitignore` and will skip files that are ignored by git. If an index exists, it will use the indexed files for faster operation.
+
+**Options**:
+- `--noindex`: Do not use index, perform full directory scan
 
 ```bash
 # Decrypt in entire repository (uses index if available)
@@ -271,6 +284,9 @@ repo-secret-manager decrypt ./src
 
 # Decrypt in specific file
 repo-secret-manager decrypt ./config/database.yml
+
+# Force full directory scan (ignore index)
+repo-secret-manager decrypt --noindex
 ```
 
 ### Redact Secrets (Create Redacted Files)
@@ -280,10 +296,13 @@ Create redacted versions of files containing secrets. Redacted files have `.reda
 **Important Notes:**
 - Redacted files are **only created** if at least one secret was replaced in the file
 - By default, original files are automatically added to `.gitignore` to prevent accidental commits
-- Use `--nogitignore` flag to disable automatic `.gitignore` updates
 - The redact command respects `.gitignore` and will skip files that are ignored by git
-- Redacted files are overwritten if they already exist
+- If a redacted file already exists, it's only updated if the content differs
 - Files that already have `.redacted` in their name are skipped
+
+**Options**:
+- `--nogitignore`: Do not add original files to `.gitignore`
+- `--noindex`: Do not use index, perform full directory scan
 
 ```bash
 # Create redacted files for entire repository (uses index if available)
@@ -297,6 +316,12 @@ repo-secret-manager redact ./config/database.yml
 
 # Create redacted files without updating .gitignore
 repo-secret-manager redact --nogitignore
+
+# Force full directory scan (ignore index)
+repo-secret-manager redact --noindex
+
+# Combine options
+repo-secret-manager redact --noindex --nogitignore
 ```
 
 **Example:**
@@ -312,10 +337,13 @@ repo-secret-manager redact ./config.json
 
 Restore secrets from redacted files. Takes files with `.redacted` in their name and creates files without `.redacted` containing real secret values.
 
-**Note**: The unredact command respects `.gitignore` and will skip files that are ignored by git. Output files are overwritten if they already exist.
+**Note**: The unredact command respects `.gitignore` and will skip files that are ignored by git. If an index exists, it will use the indexed files to find corresponding redacted files for faster operation. If an unredacted file already exists, it's only updated if the content differs.
+
+**Options**:
+- `--noindex`: Do not use index, perform full directory scan
 
 ```bash
-# Unredact all redacted files in entire repository
+# Unredact all redacted files in entire repository (uses index if available)
 repo-secret-manager unredact
 
 # Unredact redacted files in specific directory
@@ -323,6 +351,9 @@ repo-secret-manager unredact ./src
 
 # Unredact specific redacted file
 repo-secret-manager unredact ./config/database.redacted.yml
+
+# Force full directory scan (ignore index)
+repo-secret-manager unredact --noindex
 ```
 
 **Example:**
