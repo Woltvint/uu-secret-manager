@@ -517,7 +517,8 @@ program
 program
   .command('encrypt [path]')
   .description('Encrypt secrets in files with placeholders (default: entire repo)')
-  .action(async (targetPath: string | undefined, _options, command) => {
+  .option('--noindex', 'Do not use index, perform full directory scan')
+  .action(async (targetPath: string | undefined, cmdOptions, command) => {
     try {
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
@@ -551,8 +552,8 @@ program
       
       let encryptedFiles = 0;
       
-      // Use index if available and no specific path given
-      if (store.index && store.index.length > 0 && !targetPath) {
+      // Use index if available and no specific path given and --noindex is not set
+      if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
         store.index.forEach(indexedFile => {
           if (fs.existsSync(indexedFile.path)) {
@@ -564,7 +565,9 @@ program
         });
       } else {
         // Fall back to scanning all files
-        if (store.index && !targetPath) {
+        if (cmdOptions.noindex) {
+          console.log('Performing full directory scan (--noindex flag set)...');
+        } else if (store.index && !targetPath) {
           console.log('No index found. Performing full directory scan...');
           console.log('Tip: Run "index" command first for faster operation.');
         } else if (!store.index) {
@@ -603,7 +606,8 @@ program
 program
   .command('decrypt [path]')
   .description('Decrypt placeholders back to secrets in files (default: entire repo)')
-  .action(async (targetPath: string | undefined, _options, command) => {
+  .option('--noindex', 'Do not use index, perform full directory scan')
+  .action(async (targetPath: string | undefined, cmdOptions, command) => {
     try {
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
@@ -685,6 +689,7 @@ program
   .command('redact [path]')
   .description('Create redacted files with placeholders (default: entire repo). Redacted files have ".redacted" inserted before the file extension.')
   .option('--nogitignore', 'Do not add original files to .gitignore')
+  .option('--noindex', 'Do not use index, perform full directory scan')
   .action(async (targetPath: string | undefined, cmdOptions, command) => {
     try {
       const globalOpts = command.parent!.opts();
@@ -720,8 +725,8 @@ program
       let redactedFiles = 0;
       let gitignoreUpdated = false;
       
-      // Use index if available and no specific path given
-      if (store.index && store.index.length > 0 && !targetPath) {
+      // Use index if available and no specific path given and --noindex is not set
+      if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
         store.index.forEach(indexedFile => {
           if (fs.existsSync(indexedFile.path)) {
@@ -752,7 +757,9 @@ program
         });
       } else {
         // Fall back to scanning all files
-        if (store.index && !targetPath) {
+        if (cmdOptions.noindex) {
+          console.log('Performing full directory scan (--noindex flag set)...');
+        } else if (store.index && !targetPath) {
           console.log('No index found. Performing full directory scan...');
           console.log('Tip: Run "index" command first for faster operation.');
         } else if (!store.index) {
@@ -831,7 +838,8 @@ program
 program
   .command('unredact [path]')
   .description('Restore secrets from redacted files. Takes files with ".redacted" in the name and creates files without ".redacted" containing real values.')
-  .action(async (targetPath: string | undefined, _options, command) => {
+  .option('--noindex', 'Do not use index, perform full directory scan')
+  .action(async (targetPath: string | undefined, cmdOptions, command) => {
     try {
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
@@ -882,8 +890,8 @@ program
         }
       };
       
-      // Use index if available and no specific path given
-      if (store.index && store.index.length > 0 && !targetPath) {
+      // Use index if available and no specific path given and --noindex is not set
+      if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: checking ${store.index.length} indexed file(s) for redacted versions...`);
         store.index.forEach(indexedFile => {
           // Check if a redacted version of this indexed file exists
@@ -894,7 +902,9 @@ program
         });
       } else {
         // Fall back to scanning all files
-        if (store.index && !targetPath) {
+        if (cmdOptions.noindex) {
+          console.log('Performing full directory scan (--noindex flag set)...');
+        } else if (store.index && !targetPath) {
           console.log('No index found. Performing full directory scan...');
           console.log('Tip: Run "index" command first for faster operation.');
         } else if (!store.index) {
