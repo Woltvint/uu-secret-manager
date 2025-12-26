@@ -538,6 +538,9 @@ function addToGitignore(filePath, gitRoot) {
  */
 function indexFiles(searchPath, secrets, pattern, gitRoot, specificFiles) {
     const indexedFiles = [];
+    if (!gitRoot) {
+        throw new Error('gitRoot is required for indexing');
+    }
     const processFile = (filePath) => {
         // Apply pattern filter if provided
         if (pattern && !matchesPattern(filePath, pattern)) {
@@ -554,9 +557,11 @@ function indexFiles(searchPath, secrets, pattern, gitRoot, specificFiles) {
                 }
             });
             // Only index files that contain secrets
+            // Store path relative to git root for portability
             if (secretIds.length > 0) {
+                const relativePath = path.relative(gitRoot, filePath).replace(/\\/g, '/'); // Normalize path separators
                 indexedFiles.push({
-                    path: filePath,
+                    path: relativePath,
                     secretIds
                 });
             }

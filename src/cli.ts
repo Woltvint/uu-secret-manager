@@ -242,7 +242,7 @@ program
       
       // Merge with existing index when using git-modified mode
       if (!cmdOptions.all && store.index && store.index.length > 0) {
-        // Create a map of existing indexed files by path
+        // Create a map of existing indexed files by path (relative paths)
         const existingMap = new Map(store.index.map(f => [f.path, f]));
         
         // Update or add new indexed files
@@ -250,10 +250,11 @@ program
           existingMap.set(newFile.path, newFile);
         });
         
-        // Remove files that no longer exist
+        // Remove files that no longer exist (convert relative to absolute to check)
         const finalIndex: encrypt.IndexedFile[] = [];
-        existingMap.forEach((file, filePath) => {
-          if (fs.existsSync(filePath)) {
+        existingMap.forEach((file, relativePath) => {
+          const absolutePath = path.join(gitRoot, relativePath);
+          if (fs.existsSync(absolutePath)) {
             finalIndex.push(file);
           }
         });
@@ -270,8 +271,8 @@ program
       if (store.index!.length > 0) {
         console.log('\nFiles indexed:');
         store.index!.forEach((f: encrypt.IndexedFile) => {
-          const relPath = path.relative(gitRoot, f.path);
-          console.log(`  ${relPath} (${f.secretIds.length} secret(s))`);
+          // Path is already relative
+          console.log(`  ${f.path} (${f.secretIds.length} secret(s))`);
         });
       }
     } catch (err) {
@@ -608,8 +609,10 @@ program
       if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
         store.index.forEach(indexedFile => {
-          if (fs.existsSync(indexedFile.path)) {
-            if (encrypt.encryptSecretsInFile(indexedFile.path, secrets)) {
+          // Convert relative path to absolute path
+          const absolutePath = path.join(gitRoot, indexedFile.path);
+          if (fs.existsSync(absolutePath)) {
+            if (encrypt.encryptSecretsInFile(absolutePath, secrets)) {
               console.log(`Encrypted secrets in: ${indexedFile.path}`);
               encryptedFiles++;
             }
@@ -697,8 +700,10 @@ program
       if (store.index && store.index.length > 0 && !targetPath) {
         console.log(`Using index (${store.index.length} files)...`);
         store.index.forEach(indexedFile => {
-          if (fs.existsSync(indexedFile.path)) {
-            if (encrypt.decryptSecretsInFile(indexedFile.path, secrets)) {
+          // Convert relative path to absolute path
+          const absolutePath = path.join(gitRoot, indexedFile.path);
+          if (fs.existsSync(absolutePath)) {
+            if (encrypt.decryptSecretsInFile(absolutePath, secrets)) {
               console.log(`Decrypted placeholders in: ${indexedFile.path}`);
               decryptedFiles++;
             }
@@ -783,32 +788,36 @@ program
       if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
         store.index.forEach(indexedFile => {
-          if (fs.existsSync(indexedFile.path)) {
+          // Convert relative path to absolute path
+          const absolutePath = path.join(gitRoot, indexedFile.path);
+          if (fs.existsSync(absolutePath)) {
             // Skip if already a redacted file
-            if (encrypt.isRedactedFile(indexedFile.path)) {
+            if (encrypt.isRedactedFile(absolutePath)) {
               return;
             }
-            const result = encrypt.redactSecretsInFile(indexedFile.path, secrets);
+            const result = encrypt.redactSecretsInFile(absolutePath, secrets);
             if (result) {
               if (result.unchanged) {
                 // File exists and content is the same, no logging needed
               } else if (result.created) {
-                console.log(`Created redacted file: ${result.redactedPath}`);
+                const redactedRelativePath = path.relative(gitRoot, result.redactedPath).replace(/\\/g, '/');
+                console.log(`Created redacted file: ${redactedRelativePath}`);
                 redactedFiles++;
               } else {
-                console.log(`Updating redacted file: ${result.redactedPath}`);
+                const redactedRelativePath = path.relative(gitRoot, result.redactedPath).replace(/\\/g, '/');
+                console.log(`Updating redacted file: ${redactedRelativePath}`);
                 redactedFiles++;
               }
               
               // Add original file to .gitignore if not disabled (only if file was created or updated)
               if (!result.unchanged && !cmdOptions.nogitignore) {
-                if (encrypt.addToGitignore(indexedFile.path, gitRoot)) {
+                if (encrypt.addToGitignore(absolutePath, gitRoot)) {
                   gitignoreUpdated = true;
                 }
                 
                 // Remove file from git if tracked and not disabled (only if file was created or updated)
                 if (!cmdOptions.nogitremove) {
-                  if (encrypt.removeFileFromGit(indexedFile.path, gitRoot)) {
+                  if (encrypt.removeFileFromGit(absolutePath, gitRoot)) {
                     gitRemovedFiles++;
                   }
                 }
@@ -871,10 +880,12 @@ program
               if (result.unchanged) {
                 // File exists and content is the same, no logging needed
               } else if (result.created) {
-                console.log(`Created redacted file: ${result.redactedPath}`);
+                const redactedRelativePath = path.relative(gitRoot, result.redactedPath).replace(/\\/g, '/');
+                console.log(`Created redacted file: ${redactedRelativePath}`);
                 redactedFiles++;
               } else {
-                console.log(`Updating redacted file: ${result.redactedPath}`);
+                const redactedRelativePath = path.relative(gitRoot, result.redactedPath).replace(/\\/g, '/');
+                console.log(`Updating redacted file: ${redactedRelativePath}`);
                 redactedFiles++;
               }
               
@@ -958,10 +969,12 @@ program
             if (result.unchanged) {
               // File exists and content is the same, no logging needed
             } else if (result.created) {
-              console.log(`Created unredacted file: ${result.originalPath}`);
+              const originalRelativePath = path.relative(gitRoot, result.originalPath).replace(/\\/g, '/');
+              console.log(`Created unredacted file: ${originalRelativePath}`);
               unredactedFiles++;
             } else {
-              console.log(`Updating unredacted file: ${result.originalPath}`);
+              const originalRelativePath = path.relative(gitRoot, result.originalPath).replace(/\\/g, '/');
+              console.log(`Updating unredacted file: ${originalRelativePath}`);
               unredactedFiles++;
             }
           }
@@ -972,16 +985,18 @@ program
       if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: checking ${store.index.length} indexed file(s) for redacted versions...`);
         store.index.forEach(indexedFile => {
+          // Convert relative path to absolute path
+          const absolutePath = path.join(gitRoot, indexedFile.path);
           // The index stores original file paths (e.g., "file.json")
           // We need to check if a redacted version exists (e.g., "file.redacted.json")
           // But also handle the case where the indexed path might already be a redacted file
           let redactedPath: string;
-          if (encrypt.isRedactedFile(indexedFile.path)) {
+          if (encrypt.isRedactedFile(absolutePath)) {
             // Indexed path is already a redacted file, use it directly
-            redactedPath = indexedFile.path;
+            redactedPath = absolutePath;
           } else {
             // Convert original path to redacted path
-            redactedPath = encrypt.getRedactedFilePath(indexedFile.path);
+            redactedPath = encrypt.getRedactedFilePath(absolutePath);
           }
           
           if (fs.existsSync(redactedPath)) {

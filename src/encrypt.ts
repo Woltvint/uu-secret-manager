@@ -587,6 +587,10 @@ export function indexFiles(
 ): IndexedFile[] {
   const indexedFiles: IndexedFile[] = [];
   
+  if (!gitRoot) {
+    throw new Error('gitRoot is required for indexing');
+  }
+  
   const processFile = (filePath: string) => {
     // Apply pattern filter if provided
     if (pattern && !matchesPattern(filePath, pattern)) {
@@ -606,9 +610,11 @@ export function indexFiles(
       });
       
       // Only index files that contain secrets
+      // Store path relative to git root for portability
       if (secretIds.length > 0) {
+        const relativePath = path.relative(gitRoot, filePath).replace(/\\/g, '/'); // Normalize path separators
         indexedFiles.push({
-          path: filePath,
+          path: relativePath,
           secretIds
         });
       }
