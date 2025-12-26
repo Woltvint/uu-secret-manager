@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as vault from './vault';
 import { v4 as uuidv4 } from 'uuid';
 import * as encrypt from './encrypt';
-import { SecretData, SecretsMap, SecretsStore, generatePlaceholder, findSecretByName, nameExists } from './encrypt';
+import { SecretData, SecretsMap, SecretsStore, generatePlaceholder, findSecretByName, nameExists, findSecretByIdentifier } from './encrypt';
 
 const program = new Command();
 
@@ -452,6 +452,64 @@ program
       console.log(`Previous value: ${oldSecret.substring(0, 20)}${oldSecret.length > 20 ? '...' : ''}`);
     } catch (err) {
       console.error('Error modifying secret:', (err as Error).message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('delete <identifier>')
+  .description('Delete a secret by its custom name or UUID')
+  .action(async (identifier: string, _options, command) => {
+    try {
+      const globalOpts = command.parent!.opts();
+      const repoPath = globalOpts.repo;
+      const secretsPath = getSecretsPath(repoPath);
+      const password = await vault.getPassword(globalOpts);
+      let store: SecretsStore = { secrets: {}, index: undefined };
+      
+      try {
+        const decrypted = await vault.decryptVaultFile(secretsPath, password);
+        store = JSON.parse(decrypted);
+        // Handle old format without index
+        if (!store.secrets) {
+          store = { secrets: store as any, index: undefined };
+        }
+      } catch (err) {
+        console.error('Error: Could not load secrets file');
+        console.error('Make sure the secrets file exists and the password is correct');
+        process.exit(1);
+      }
+      
+      // Find the secret by name or UUID
+      const found = findSecretByIdentifier(store.secrets, identifier);
+      if (!found) {
+        console.error(`Error: No secret found with identifier "${identifier}"`);
+        console.error('Use "list" command to see all available secrets');
+        process.exit(1);
+      }
+      
+      const [id, data] = found;
+      const secret = typeof data === 'string' ? data : data.secret;
+      const name = typeof data === 'object' ? data.name : undefined;
+      const placeholder = generatePlaceholder(id, data);
+      
+      // Delete the secret
+      delete store.secrets[id];
+      
+      // Update index to remove references to this secret
+      if (store.index) {
+        store.index = store.index.map(indexedFile => ({
+          ...indexedFile,
+          secretIds: indexedFile.secretIds.filter(secretId => secretId !== id)
+        })).filter(indexedFile => indexedFile.secretIds.length > 0);
+      }
+      
+      await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
+      console.log(`Secret "${identifier}" deleted successfully`);
+      console.log(`Note: Placeholders in files (${placeholder}) will remain but will not be decrypted.`);
+      console.log('Consider running "encrypt" to remove placeholders from files, or update files manually.');
+    } catch (err) {
+      console.error('Error deleting secret:', (err as Error).message);
       process.exit(1);
     }
   });

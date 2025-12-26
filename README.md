@@ -10,6 +10,7 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Export secrets to CSV for backup or migration
 - Add new secrets with UUID-based or custom-named placeholders
 - Modify existing secrets by their custom name
+- Delete secrets by their custom name or UUID
 - **Index files** for dramatically faster encrypt/decrypt operations
 - Encrypt secrets in files with placeholders (`<!secret_{uuid}!>` or `<!secret_{name}!>`)
 - Decrypt placeholders back to original secrets
@@ -134,6 +135,24 @@ repo-secret-manager modify "db-password" "new-password-value" "Updated database 
 - The secret must have a custom name (created with `add <name> <secret>`)
 - If the name doesn't exist, the command will fail
 - Use `list` to see all available secrets and their names
+
+### Delete a Secret
+
+Delete a secret from the store by its custom name or UUID.
+
+```bash
+# Delete by custom name
+repo-secret-manager delete "db-password"
+
+# Delete by UUID
+repo-secret-manager delete "35f8756c-5cf3-455e-b843-b73fa87769c6"
+```
+
+**Notes:**
+- The command will first try to find the secret by custom name, then by UUID
+- The secret will be immediately removed from the store
+- Placeholders in files will remain but will not be decrypted (consider running `encrypt` to clean them up)
+- The index will be automatically updated to remove references to the deleted secret
 
 ### List Secrets
 
@@ -302,10 +321,15 @@ repo-secret-manager list
 # 9. Modify an existing secret (by custom name)
 repo-secret-manager modify "db-password" "new-database-password-456" "Updated database password"
 
-# 10. Export secrets to CSV for backup
+# 10. Delete a secret (by custom name or UUID)
+repo-secret-manager delete "db-password"
+# Or delete by UUID:
+repo-secret-manager delete "35f8756c-5cf3-455e-b843-b73fa87769c6"
+
+# 11. Export secrets to CSV for backup
 repo-secret-manager export ./secrets-backup.csv
 
-# 11. Work with a different repository
+# 12. Work with a different repository
 repo-secret-manager -r /path/to/other/repo add "another-secret"
 repo-secret-manager -r /path/to/other/repo add "my-secret-name" "another-secret"
 repo-secret-manager -r /path/to/other/repo list

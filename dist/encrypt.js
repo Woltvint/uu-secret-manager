@@ -37,6 +37,7 @@ exports.getPlaceholderId = getPlaceholderId;
 exports.generatePlaceholder = generatePlaceholder;
 exports.findSecretByName = findSecretByName;
 exports.nameExists = nameExists;
+exports.findSecretByIdentifier = findSecretByIdentifier;
 exports.getGitModifiedFiles = getGitModifiedFiles;
 exports.matchesPattern = matchesPattern;
 exports.isGitIgnored = isGitIgnored;
@@ -93,6 +94,24 @@ function findSecretByName(secrets, name) {
  */
 function nameExists(secrets, name) {
     return findSecretByName(secrets, name) !== null;
+}
+/**
+ * Finds a secret by either its custom name or UUID
+ * @param secrets - Map of secrets
+ * @param identifier - Custom name or UUID to search for
+ * @returns Tuple of [id, data] if found, null otherwise
+ */
+function findSecretByIdentifier(secrets, identifier) {
+    // First try to find by custom name
+    const byName = findSecretByName(secrets, identifier);
+    if (byName) {
+        return byName;
+    }
+    // Then try to find by UUID
+    if (secrets[identifier]) {
+        return [identifier, secrets[identifier]];
+    }
+    return null;
 }
 /**
  * Gets list of modified files in git (staged and unstaged)

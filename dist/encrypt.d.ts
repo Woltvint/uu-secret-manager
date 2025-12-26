@@ -42,6 +42,13 @@ export declare function findSecretByName(secrets: SecretsMap, name: string): [st
  */
 export declare function nameExists(secrets: SecretsMap, name: string): boolean;
 /**
+ * Finds a secret by either its custom name or UUID
+ * @param secrets - Map of secrets
+ * @param identifier - Custom name or UUID to search for
+ * @returns Tuple of [id, data] if found, null otherwise
+ */
+export declare function findSecretByIdentifier(secrets: SecretsMap, identifier: string): [string, SecretData | string] | null;
+/**
  * Gets list of modified files in git (staged and unstaged)
  * @param gitRoot - Root directory of the git repository
  * @returns Array of absolute file paths that have been modified
