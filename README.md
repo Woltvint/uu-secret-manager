@@ -296,12 +296,14 @@ Create redacted versions of files containing secrets. Redacted files have `.reda
 **Important Notes:**
 - Redacted files are **only created** if at least one secret was replaced in the file
 - By default, original files are automatically added to `.gitignore` to prevent accidental commits
+- By default, if an original file is tracked in git, it will be removed from git tracking (file preserved locally)
 - The redact command respects `.gitignore` and will skip files that are ignored by git
 - If a redacted file already exists, it's only updated if the content differs
 - Files that already have `.redacted` in their name are skipped
 
 **Options**:
 - `--nogitignore`: Do not add original files to `.gitignore`
+- `--nogitremove`: Do not remove tracked files from git
 - `--noindex`: Do not use index, perform full directory scan
 
 ```bash
@@ -317,11 +319,14 @@ repo-secret-manager redact ./config/database.yml
 # Create redacted files without updating .gitignore
 repo-secret-manager redact --nogitignore
 
+# Create redacted files without removing from git (still adds to .gitignore)
+repo-secret-manager redact --nogitremove
+
 # Force full directory scan (ignore index)
 repo-secret-manager redact --noindex
 
 # Combine options
-repo-secret-manager redact --noindex --nogitignore
+repo-secret-manager redact --noindex --nogitignore --nogitremove
 ```
 
 **Example:**
@@ -329,8 +334,9 @@ repo-secret-manager redact --noindex --nogitignore
 # Original file: config.json contains "password": "my-secret-123"
 repo-secret-manager redact ./config.json
 # Creates: config.redacted.json contains "password": "<!secret_db-password!>"
-# Original file: config.json remains unchanged
+# Original file: config.json remains unchanged (preserved locally)
 # Adds: config.json to .gitignore (if not already present)
+# Removes: config.json from git tracking (if tracked, file preserved locally)
 ```
 
 ### Unredact Redacted Files

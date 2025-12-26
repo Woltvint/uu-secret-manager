@@ -730,6 +730,7 @@ program
     .command('redact [path]')
     .description('Create redacted files with placeholders (default: entire repo). Redacted files have ".redacted" inserted before the file extension.')
     .option('--nogitignore', 'Do not add original files to .gitignore')
+    .option('--nogitremove', 'Do not remove tracked files from git')
     .option('--noindex', 'Do not use index, perform full directory scan')
     .action(async (targetPath, cmdOptions, command) => {
     try {
@@ -763,6 +764,7 @@ program
         }
         let redactedFiles = 0;
         let gitignoreUpdated = false;
+        let gitRemovedFiles = 0;
         // Use index if available and no specific path given and --noindex is not set
         if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
             console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
@@ -789,6 +791,12 @@ program
                         if (!result.unchanged && !cmdOptions.nogitignore) {
                             if (encrypt.addToGitignore(indexedFile.path, gitRoot)) {
                                 gitignoreUpdated = true;
+                            }
+                            // Remove file from git if tracked and not disabled (only if file was created or updated)
+                            if (!cmdOptions.nogitremove) {
+                                if (encrypt.removeFileFromGit(indexedFile.path, gitRoot)) {
+                                    gitRemovedFiles++;
+                                }
                             }
                         }
                     }
@@ -832,6 +840,12 @@ program
                             if (encrypt.addToGitignore(searchPath, gitRoot)) {
                                 gitignoreUpdated = true;
                             }
+                            // Remove file from git if tracked and not disabled (only if file was created or updated)
+                            if (!cmdOptions.nogitremove) {
+                                if (encrypt.removeFileFromGit(searchPath, gitRoot)) {
+                                    gitRemovedFiles++;
+                                }
+                            }
                         }
                     }
                 }
@@ -860,6 +874,12 @@ program
                             if (encrypt.addToGitignore(filePath, gitRoot)) {
                                 gitignoreUpdated = true;
                             }
+                            // Remove file from git if tracked and not disabled (only if file was created or updated)
+                            if (!cmdOptions.nogitremove) {
+                                if (encrypt.removeFileFromGit(filePath, gitRoot)) {
+                                    gitRemovedFiles++;
+                                }
+                            }
                         }
                     }
                 }, gitRoot);
@@ -872,6 +892,9 @@ program
             console.log(`\nCreated ${redactedFiles} redacted file(s).`);
             if (gitignoreUpdated) {
                 console.log('Added original file(s) to .gitignore to prevent accidental commits.');
+            }
+            if (gitRemovedFiles > 0) {
+                console.log(`Removed ${gitRemovedFiles} tracked file(s) from git (files preserved locally).`);
             }
         }
     }

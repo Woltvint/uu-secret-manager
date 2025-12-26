@@ -144,6 +144,20 @@ export interface UnredactResult {
  */
 export declare function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): UnredactResult | null;
 /**
+ * Checks if a file is tracked in git
+ * @param filePath - Path to the file to check
+ * @param gitRoot - Root directory of the git repository
+ * @returns true if the file is tracked in git, false otherwise
+ */
+export declare function isFileTrackedInGit(filePath: string, gitRoot: string): boolean;
+/**
+ * Removes a file from git tracking (keeps the file locally)
+ * @param filePath - Path to the file to remove from git
+ * @param gitRoot - Root directory of the git repository
+ * @returns true if the file was removed, false if it wasn't tracked or removal failed
+ */
+export declare function removeFileFromGit(filePath: string, gitRoot: string): boolean;
+/**
  * Adds a file path to .gitignore if it doesn't already exist there
  * @param filePath - Path to the file to add to .gitignore
  * @param gitRoot - Root directory of the git repository

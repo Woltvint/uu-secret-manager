@@ -50,6 +50,8 @@ exports.isRedactedFile = isRedactedFile;
 exports.getOriginalFilePath = getOriginalFilePath;
 exports.redactSecretsInFile = redactSecretsInFile;
 exports.unredactSecretsInFile = unredactSecretsInFile;
+exports.isFileTrackedInGit = isFileTrackedInGit;
+exports.removeFileFromGit = removeFileFromGit;
 exports.addToGitignore = addToGitignore;
 exports.indexFiles = indexFiles;
 exports.encryptIndexedFiles = encryptIndexedFiles;
@@ -441,6 +443,51 @@ function unredactSecretsInFile(redactedFilePath, secrets) {
         };
     }
     return null;
+}
+/**
+ * Checks if a file is tracked in git
+ * @param filePath - Path to the file to check
+ * @param gitRoot - Root directory of the git repository
+ * @returns true if the file is tracked in git, false otherwise
+ */
+function isFileTrackedInGit(filePath, gitRoot) {
+    try {
+        const relativePath = path.relative(gitRoot, filePath).replace(/\\/g, '/');
+        (0, child_process_1.execSync)(`git ls-files --error-unmatch "${relativePath}"`, {
+            cwd: gitRoot,
+            encoding: 'utf8',
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+/**
+ * Removes a file from git tracking (keeps the file locally)
+ * @param filePath - Path to the file to remove from git
+ * @param gitRoot - Root directory of the git repository
+ * @returns true if the file was removed, false if it wasn't tracked or removal failed
+ */
+function removeFileFromGit(filePath, gitRoot) {
+    try {
+        const relativePath = path.relative(gitRoot, filePath).replace(/\\/g, '/');
+        // Check if file is tracked first
+        if (!isFileTrackedInGit(filePath, gitRoot)) {
+            return false;
+        }
+        // Remove from git index but keep locally
+        (0, child_process_1.execSync)(`git rm --cached "${relativePath}"`, {
+            cwd: gitRoot,
+            encoding: 'utf8',
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        return true;
+    }
+    catch {
+        return false;
+    }
 }
 /**
  * Adds a file path to .gitignore if it doesn't already exist there
