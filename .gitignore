@@ -29,3 +29,6 @@ Thumbs.db
 # install-hook.js
 # test.js
 
+.idea/
+.vscode/
+

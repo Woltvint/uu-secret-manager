@@ -13,7 +13,8 @@
     "watch": "tsc --watch",
     "test": "npm run build && node --test dist/test.js",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "uu-safe-install": "npx uu-safe-install"
   },
   "files": [
     "dist/**/*",

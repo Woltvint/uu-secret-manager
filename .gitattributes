@@ -1,0 +1,38 @@
+# Enforce LF line endings across the repository
+# Default behavior: detect text files and normalize to LF on checkout
+* text=auto eol=lf
+
+# Force LF for common text-based source files (helpful on Windows)
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.ts text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.tsx text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# Do not treat binaries as text
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.gif -text
+*.ico -text
+*.pdf -text
+*.zip -text
+*.tar -text
+*.gz -text
+*.7z -text
+*.exe -text
+*.dll -text
+*.so -text
+
+# Node modules and lockfiles are handled by .gitignore but ensure they are not normalized
+node_modules/** -text
+
+# Keep this file itself using LF
+.gitattributes text eol=lf
+
