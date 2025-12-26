@@ -74,7 +74,7 @@ function getSecretsPath(repoPath) {
 program
     .name('repo-secret-manager')
     .description('CLI to manage secrets in files and folders')
-    .version('2.0.0')
+    .version('2.1.0-DEV')
     .option('-r, --repo <path>', 'Path to git repository (default: current directory)', '.')
     .option('-p, --password <password>', 'Vault password (not recommended for security)')
     .option('-f, --password-file <path>', 'Path to file containing vault password')
