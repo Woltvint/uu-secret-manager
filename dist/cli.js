@@ -960,8 +960,18 @@ program
         if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
             console.log(`Using index: checking ${store.index.length} indexed file(s) for redacted versions...`);
             store.index.forEach(indexedFile => {
-                // Check if a redacted version of this indexed file exists
-                const redactedPath = encrypt.getRedactedFilePath(indexedFile.path);
+                // The index stores original file paths (e.g., "file.json")
+                // We need to check if a redacted version exists (e.g., "file.redacted.json")
+                // But also handle the case where the indexed path might already be a redacted file
+                let redactedPath;
+                if (encrypt.isRedactedFile(indexedFile.path)) {
+                    // Indexed path is already a redacted file, use it directly
+                    redactedPath = indexedFile.path;
+                }
+                else {
+                    // Convert original path to redacted path
+                    redactedPath = encrypt.getRedactedFilePath(indexedFile.path);
+                }
                 if (fs.existsSync(redactedPath)) {
                     processRedactedFile(redactedPath);
                 }
