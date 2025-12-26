@@ -8,9 +8,10 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Automatically places secrets file in git repository root
 - List all stored secrets
 - Export secrets to CSV for backup or migration
-- Add new secrets with UUID-based placeholders
+- Add new secrets with UUID-based or custom-named placeholders
+- Modify existing secrets by their custom name
 - **Index files** for dramatically faster encrypt/decrypt operations
-- Encrypt secrets in files with placeholders (`<!secret_{uuid}!>`)
+- Encrypt secrets in files with placeholders (`<!secret_{uuid}!>` or `<!secret_{name}!>`)
 - Decrypt placeholders back to original secrets
 - Filter indexing by file patterns (e.g., `*.js`, `(*.js|*.json)`)
 - Works exclusively with git repositories
@@ -36,6 +37,7 @@ npx github:Woltvint/repo-secret-manager <command>
 Examples:
 ```bash
 npx github:Woltvint/repo-secret-manager add "my-secret"
+npx github:Woltvint/repo-secret-manager add "db-password" "my-secret-value"
 npx github:Woltvint/repo-secret-manager list
 npx github:Woltvint/repo-secret-manager encrypt
 ```
@@ -88,26 +90,54 @@ All commands work from anywhere within your git repository. The tool automatical
 
 ### Add a Secret
 
-Add a new secret to the encrypted store. The tool will generate a UUID and return the placeholder.
+Add a new secret to the encrypted store. You can optionally provide a custom name for the placeholder, otherwise a UUID will be auto-generated.
 The secrets file will be created in the root of your git repository as `repo-secret-manager.json`.
 
+**Syntax:**
+- `add <secret>` - Add secret with auto-generated UUID placeholder (backward compatible)
+- `add <name> <secret>` - Add secret with custom name
+- `add <name> <secret> <description>` - Add secret with custom name and description
+
 ```bash
+# Add secret with auto-generated UUID (backward compatible)
 repo-secret-manager add "my-secret-password"
-# or with npx from npm:
-npx repo-secret-manager add "my-secret-password"
-# or directly from GitHub:
-npx github:Woltvint/repo-secret-manager add "my-secret-password"
+# Output: Secret added with placeholder: <!secret_35f8756c-5cf3-455e-b843-b73fa87769c6!>
+
+# Add secret with custom name
+repo-secret-manager add "db-password" "my-secret-password"
+# Output: Secret added with placeholder: <!secret_db-password!>
+#         Name: db-password
+
+# Add secret with custom name and description
+repo-secret-manager add "db-password" "my-secret-password" "Database password"
+# Output: Secret added with placeholder: <!secret_db-password!>
+#         Description: Database password
+#         Name: db-password
 ```
 
-Output:
+**Notes:**
+- Custom names must contain only alphanumeric characters, underscores, or hyphens
+- If a name already exists, the command will fail (use `modify` to update existing secrets)
+- Duplicate secret values are not allowed
+
+### Modify a Secret
+
+Update an existing secret by its custom name. This command allows you to change the secret value or description for a named placeholder.
+
+```bash
+repo-secret-manager modify "db-password" "new-password-value"
+# or with description:
+repo-secret-manager modify "db-password" "new-password-value" "Updated database password"
 ```
-Vault password: ****
-Secret added with placeholder: <!secret_35f8756c-5cf3-455e-b843-b73fa87769c6!>
-```
+
+**Notes:**
+- The secret must have a custom name (created with `add <name> <secret>`)
+- If the name doesn't exist, the command will fail
+- Use `list` to see all available secrets and their names
 
 ### List Secrets
 
-List all secrets stored in the encrypted file.
+List all secrets stored in the encrypted file. Shows UUID, custom name (if any), secret value, description, creation date, and placeholder.
 
 ```bash
 repo-secret-manager list
@@ -115,6 +145,23 @@ repo-secret-manager list
 npx repo-secret-manager list
 # or directly from GitHub:
 npx github:Woltvint/repo-secret-manager list
+```
+
+Example output:
+```
+Secrets:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+UUID: 35f8756c-5cf3-455e-b843-b73fa87769c6
+Secret: my-secret-password
+Placeholder: <!secret_35f8756c-5cf3-455e-b843-b73fa87769c6!>
+
+UUID: abc123-def456-ghi789
+Name: db-password
+Secret: database-password-123
+Description: Database password
+Created: 12/25/2024, 10:30:00 AM
+Placeholder: <!secret_db-password!>
 ```
 
 ### Export Secrets to CSV
@@ -129,7 +176,7 @@ npx repo-secret-manager export ./secrets-backup.csv
 npx github:Woltvint/repo-secret-manager export ./secrets-backup.csv
 ```
 
-The CSV file will contain columns: UUID, Secret, Description, Created, Placeholder
+The CSV file will contain columns: UUID, Name, Secret, Description, Created, Placeholder
 
 ### Index Files for Faster Operations
 
@@ -200,8 +247,10 @@ repo-secret-manager decrypt ./config/database.yml
 1. **Git Repository**: The tool finds the root of your git repository automatically
 2. **Encryption**: Secrets are stored in `repo-secret-manager.json` at the repository root, encrypted with ansible-vault
 3. **Password Prompt**: The tool prompts for the vault password when accessing secrets
-4. **UUID Mapping**: Each secret is mapped to a UUID (e.g., `35f8756c-5cf3-455e-b843-b73fa87769c6`)
-5. **Placeholder Format**: Secrets are encrypted with `<!secret_{uuid}!>` in files
+4. **Secret Mapping**: Each secret is mapped to a UUID internally, but can optionally have a custom name for the placeholder
+5. **Placeholder Format**: Secrets are encrypted with placeholders in files:
+   - UUID-based: `<!secret_{uuid}!>` (e.g., `<!secret_35f8756c-5cf3-455e-b843-b73fa87769c6!>`)
+   - Name-based: `<!secret_{name}!>` (e.g., `<!secret_db-password!>`)
 6. **File Processing**: The tool recursively walks directories and encrypts/decrypts secrets/placeholders in all files
 
 ## Security Notes
@@ -219,11 +268,16 @@ repo-secret-manager decrypt ./config/database.yml
 git init
 
 # 2. Add secrets to the store
+# Option 1: With auto-generated UUID (backward compatible)
 repo-secret-manager add "database-password-123"
-# Output: Secret added with placeholder: <!secret_abc-123!>
+# Output: Secret added with placeholder: <!secret_35f8756c-5cf3-455e-b843-b73fa87769c6!>
 
-repo-secret-manager add "api-key-xyz"
-# Output: Secret added with placeholder: <!secret_def-456!>
+# Option 2: With custom name (recommended for easier management)
+repo-secret-manager add "db-password" "database-password-123" "Database password"
+# Output: Secret added with placeholder: <!secret_db-password!>
+
+repo-secret-manager add "api-key" "api-key-xyz" "API key for external service"
+# Output: Secret added with placeholder: <!secret_api-key!>
 
 # 3. Index files for faster operations (optional but recommended)
 repo-secret-manager index . "(*.js|*.json|*.yml)"
@@ -232,7 +286,8 @@ repo-secret-manager index . "(*.js|*.json|*.yml)"
 repo-secret-manager encrypt
 
 # 5. Your files now contain placeholders instead of secrets
-# Example: connection_string = "postgres://user:<!secret_abc-123!>@localhost/db"
+# Example: connection_string = "postgres://user:<!secret_db-password!>@localhost/db"
+# Or with UUID: connection_string = "postgres://user:<!secret_35f8756c-5cf3-455e-b843-b73fa87769c6!>@localhost/db"
 
 # 6. Commit the files with placeholders (safe!)
 git add .
@@ -244,11 +299,15 @@ repo-secret-manager decrypt
 # 8. List all stored secrets
 repo-secret-manager list
 
-# 9. Export secrets to CSV for backup
+# 9. Modify an existing secret (by custom name)
+repo-secret-manager modify "db-password" "new-database-password-456" "Updated database password"
+
+# 10. Export secrets to CSV for backup
 repo-secret-manager export ./secrets-backup.csv
 
-# 10. Work with a different repository
+# 11. Work with a different repository
 repo-secret-manager -r /path/to/other/repo add "another-secret"
+repo-secret-manager -r /path/to/other/repo add "my-secret-name" "another-secret"
 repo-secret-manager -r /path/to/other/repo list
 ```
 
@@ -290,7 +349,7 @@ npm test
 src/
 ├── cli.ts          # Main CLI entry point
 ├── vault.ts        # Vault encryption/decryption functions
-├── replace.ts      # File replacement operations
+├── encrypt.ts      # File encryption/decryption and indexing operations
 ├── install-hook.ts # Git hook installer
 └── test.ts         # Test suite
 ```
