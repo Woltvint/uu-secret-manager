@@ -882,17 +882,39 @@ program
         }
       };
       
-      const stats = fs.statSync(searchPath);
-      if (stats.isFile()) {
-        processRedactedFile(searchPath);
-      } else {
-        encrypt.walkDir(searchPath, (filePath) => {
-          // Skip the secrets file itself
-          if (filePath === secretsPath) {
-            return;
+      // Use index if available and no specific path given
+      if (store.index && store.index.length > 0 && !targetPath) {
+        console.log(`Using index: checking ${store.index.length} indexed file(s) for redacted versions...`);
+        store.index.forEach(indexedFile => {
+          // Check if a redacted version of this indexed file exists
+          const redactedPath = encrypt.getRedactedFilePath(indexedFile.path);
+          if (fs.existsSync(redactedPath)) {
+            processRedactedFile(redactedPath);
           }
-          processRedactedFile(filePath);
-        }, gitRoot);
+        });
+      } else {
+        // Fall back to scanning all files
+        if (store.index && !targetPath) {
+          console.log('No index found. Performing full directory scan...');
+          console.log('Tip: Run "index" command first for faster operation.');
+        } else if (!store.index) {
+          console.log('Performing full directory scan (no index available)...');
+        } else {
+          console.log('Performing full directory scan (specific path provided)...');
+        }
+        
+        const stats = fs.statSync(searchPath);
+        if (stats.isFile()) {
+          processRedactedFile(searchPath);
+        } else {
+          encrypt.walkDir(searchPath, (filePath) => {
+            // Skip the secrets file itself
+            if (filePath === secretsPath) {
+              return;
+            }
+            processRedactedFile(filePath);
+          }, gitRoot);
+        }
       }
       
       if (unredactedFiles === 0) {
