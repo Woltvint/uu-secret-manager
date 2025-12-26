@@ -670,6 +670,190 @@ program
     }
 });
 program
+    .command('redact [path]')
+    .description('Create redacted files with placeholders (default: entire repo). Redacted files have ".redacted" inserted before the file extension.')
+    .option('--nogitignore', 'Do not add original files to .gitignore')
+    .action(async (targetPath, cmdOptions, command) => {
+    try {
+        const globalOpts = command.parent.opts();
+        const repoPath = globalOpts.repo;
+        const gitRoot = findGitRoot(repoPath);
+        if (!gitRoot) {
+            console.error('Error: Not in a git repository');
+            process.exit(1);
+        }
+        const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+        const password = await vault.getPassword(globalOpts);
+        const decrypted = await vault.decryptVaultFile(secretsPath, password);
+        let store;
+        let secrets;
+        try {
+            store = JSON.parse(decrypted);
+            // Handle old format without index
+            if (!store.secrets) {
+                secrets = store;
+                store = { secrets, index: undefined };
+            }
+            else {
+                secrets = store.secrets;
+            }
+        }
+        catch (err) {
+            console.error('Error: Could not parse secrets file');
+            process.exit(1);
+        }
+        let redactedFiles = 0;
+        let gitignoreUpdated = false;
+        // Use index if available and no specific path given
+        if (store.index && store.index.length > 0 && !targetPath) {
+            console.log(`Using index (${store.index.length} files)...`);
+            store.index.forEach(indexedFile => {
+                if (fs.existsSync(indexedFile.path)) {
+                    // Skip if already a redacted file
+                    if (encrypt.isRedactedFile(indexedFile.path)) {
+                        return;
+                    }
+                    const redactedPath = encrypt.redactSecretsInFile(indexedFile.path, secrets);
+                    if (redactedPath) {
+                        console.log(`Created redacted file: ${redactedPath}`);
+                        redactedFiles++;
+                        // Add original file to .gitignore if not disabled
+                        if (!cmdOptions.nogitignore) {
+                            if (encrypt.addToGitignore(indexedFile.path, gitRoot)) {
+                                gitignoreUpdated = true;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        else {
+            // Fall back to scanning all files
+            if (store.index && !targetPath) {
+                console.log('No index found. Run "index" command first for faster operation.');
+            }
+            const stats = fs.statSync(searchPath);
+            if (stats.isFile()) {
+                // Skip if already a redacted file
+                if (!encrypt.isRedactedFile(searchPath)) {
+                    const redactedPath = encrypt.redactSecretsInFile(searchPath, secrets);
+                    if (redactedPath) {
+                        console.log(`Created redacted file: ${redactedPath}`);
+                        redactedFiles++;
+                        // Add original file to .gitignore if not disabled
+                        if (!cmdOptions.nogitignore) {
+                            if (encrypt.addToGitignore(searchPath, gitRoot)) {
+                                gitignoreUpdated = true;
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                encrypt.walkDir(searchPath, (filePath) => {
+                    // Skip the secrets file itself and redacted files
+                    if (filePath === secretsPath || encrypt.isRedactedFile(filePath)) {
+                        return;
+                    }
+                    const redactedPath = encrypt.redactSecretsInFile(filePath, secrets);
+                    if (redactedPath) {
+                        console.log(`Created redacted file: ${redactedPath}`);
+                        redactedFiles++;
+                        // Add original file to .gitignore if not disabled
+                        if (!cmdOptions.nogitignore) {
+                            if (encrypt.addToGitignore(filePath, gitRoot)) {
+                                gitignoreUpdated = true;
+                            }
+                        }
+                    }
+                }, gitRoot);
+            }
+        }
+        if (redactedFiles === 0) {
+            console.log('No redacted files created.');
+        }
+        else {
+            console.log(`\nCreated ${redactedFiles} redacted file(s).`);
+            if (gitignoreUpdated) {
+                console.log('Added original file(s) to .gitignore to prevent accidental commits.');
+            }
+        }
+    }
+    catch (err) {
+        console.error('Error creating redacted files:', err.message);
+        process.exit(1);
+    }
+});
+program
+    .command('unredact [path]')
+    .description('Restore secrets from redacted files. Takes files with ".redacted" in the name and creates files without ".redacted" containing real values.')
+    .action(async (targetPath, _options, command) => {
+    try {
+        const globalOpts = command.parent.opts();
+        const repoPath = globalOpts.repo;
+        const gitRoot = findGitRoot(repoPath);
+        if (!gitRoot) {
+            console.error('Error: Not in a git repository');
+            process.exit(1);
+        }
+        const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.json');
+        const password = await vault.getPassword(globalOpts);
+        const decrypted = await vault.decryptVaultFile(secretsPath, password);
+        let store;
+        let secrets;
+        try {
+            store = JSON.parse(decrypted);
+            // Handle old format without index
+            if (!store.secrets) {
+                secrets = store;
+                store = { secrets, index: undefined };
+            }
+            else {
+                secrets = store.secrets;
+            }
+        }
+        catch (err) {
+            console.error('Error: Could not parse secrets file');
+            process.exit(1);
+        }
+        let unredactedFiles = 0;
+        const processRedactedFile = (filePath) => {
+            if (encrypt.isRedactedFile(filePath)) {
+                const unredactedPath = encrypt.unredactSecretsInFile(filePath, secrets);
+                if (unredactedPath) {
+                    console.log(`Created unredacted file: ${unredactedPath}`);
+                    unredactedFiles++;
+                }
+            }
+        };
+        const stats = fs.statSync(searchPath);
+        if (stats.isFile()) {
+            processRedactedFile(searchPath);
+        }
+        else {
+            encrypt.walkDir(searchPath, (filePath) => {
+                // Skip the secrets file itself
+                if (filePath === secretsPath) {
+                    return;
+                }
+                processRedactedFile(filePath);
+            }, gitRoot);
+        }
+        if (unredactedFiles === 0) {
+            console.log('No redacted files found to unredact.');
+        }
+        else {
+            console.log(`\nCreated ${unredactedFiles} unredacted file(s).`);
+        }
+    }
+    catch (err) {
+        console.error('Error unredacting files:', err.message);
+        process.exit(1);
+    }
+});
+program
     .command('install-hook')
     .description('Install git pre-commit hook to check for secrets')
     .action(() => {

@@ -12,8 +12,10 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Modify existing secrets by their custom name
 - Delete secrets by their custom name or UUID
 - **Index files** for dramatically faster encrypt/decrypt operations
-- Encrypt secrets in files with placeholders (`<!secret_{uuid}!>` or `<!secret_{name}!>`)
-- Decrypt placeholders back to original secrets
+- Encrypt secrets in files with placeholders (`<!secret_{uuid}!>` or `<!secret_{name}!>`) - in-place replacement
+- Decrypt placeholders back to original secrets - in-place replacement
+- Redact secrets by creating separate files with `.redacted` suffix (e.g., `file.json` -> `file.redacted.json`)
+- Unredact redacted files to restore original files with real values
 - Filter indexing by file patterns (e.g., `*.js`, `(*.js|*.json)`)
 - Works exclusively with git repositories
 - Git pre-commit hook to prevent committing unencrypted secrets
@@ -261,6 +263,66 @@ repo-secret-manager decrypt ./src
 repo-secret-manager decrypt ./config/database.yml
 ```
 
+### Redact Secrets (Create Redacted Files)
+
+Create redacted versions of files containing secrets. Redacted files have `.redacted` inserted before the file extension (e.g., `passwords.json` -> `passwords.redacted.json`). The original files remain unchanged.
+
+**Important Notes:**
+- Redacted files are **only created** if at least one secret was replaced in the file
+- By default, original files are automatically added to `.gitignore` to prevent accidental commits
+- Use `--nogitignore` flag to disable automatic `.gitignore` updates
+- The redact command respects `.gitignore` and will skip files that are ignored by git
+- Redacted files are overwritten if they already exist
+- Files that already have `.redacted` in their name are skipped
+
+```bash
+# Create redacted files for entire repository (uses index if available)
+repo-secret-manager redact
+
+# Create redacted files for specific directory
+repo-secret-manager redact ./src
+
+# Create redacted file for specific file
+repo-secret-manager redact ./config/database.yml
+
+# Create redacted files without updating .gitignore
+repo-secret-manager redact --nogitignore
+```
+
+**Example:**
+```bash
+# Original file: config.json contains "password": "my-secret-123"
+repo-secret-manager redact ./config.json
+# Creates: config.redacted.json contains "password": "<!secret_db-password!>"
+# Original file: config.json remains unchanged
+# Adds: config.json to .gitignore (if not already present)
+```
+
+### Unredact Redacted Files
+
+Restore secrets from redacted files. Takes files with `.redacted` in their name and creates files without `.redacted` containing real secret values.
+
+**Note**: The unredact command respects `.gitignore` and will skip files that are ignored by git. Output files are overwritten if they already exist.
+
+```bash
+# Unredact all redacted files in entire repository
+repo-secret-manager unredact
+
+# Unredact redacted files in specific directory
+repo-secret-manager unredact ./src
+
+# Unredact specific redacted file
+repo-secret-manager unredact ./config/database.redacted.yml
+```
+
+**Example:**
+```bash
+# Redacted file: config.redacted.json contains "password": "<!secret_db-password!>"
+repo-secret-manager unredact ./config.redacted.json
+# Creates: config.json contains "password": "my-secret-123"
+# Redacted file: config.redacted.json remains unchanged
+```
+
 ## How It Works
 
 1. **Git Repository**: The tool finds the root of your git repository automatically
@@ -314,6 +376,15 @@ git commit -m "Use secret placeholders"
 
 # 7. To restore secrets (e.g., before deployment):
 repo-secret-manager decrypt
+
+# 7a. Alternative: Create redacted files instead of modifying originals
+repo-secret-manager redact
+# This creates files like config.redacted.json with placeholders
+# Original files remain unchanged
+
+# 7b. Restore secrets from redacted files
+repo-secret-manager unredact
+# This creates files like config.json with real values from config.redacted.json
 
 # 8. List all stored secrets
 repo-secret-manager list

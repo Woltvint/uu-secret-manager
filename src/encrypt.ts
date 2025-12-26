@@ -247,6 +247,132 @@ export function decryptSecretsInFile(filePath: string, secrets: SecretsMap): boo
 }
 
 /**
+ * Generates a redacted file path by inserting ".redacted" before the file extension
+ * @param filePath - Original file path
+ * @returns Redacted file path (e.g., "file.json" -> "file.redacted.json")
+ */
+export function getRedactedFilePath(filePath: string): string {
+  const dir = path.dirname(filePath);
+  const basename = path.basename(filePath);
+  const ext = path.extname(basename);
+  const nameWithoutExt = path.basename(basename, ext);
+  
+  return path.join(dir, `${nameWithoutExt}.redacted${ext}`);
+}
+
+/**
+ * Checks if a file path represents a redacted file
+ * @param filePath - File path to check
+ * @returns true if the file is a redacted file
+ */
+export function isRedactedFile(filePath: string): boolean {
+  const basename = path.basename(filePath);
+  return basename.includes('.redacted.');
+}
+
+/**
+ * Generates the original file path from a redacted file path
+ * @param redactedFilePath - Redacted file path
+ * @returns Original file path (e.g., "file.redacted.json" -> "file.json")
+ */
+export function getOriginalFilePath(redactedFilePath: string): string {
+  const dir = path.dirname(redactedFilePath);
+  const basename = path.basename(redactedFilePath);
+  const ext = path.extname(basename);
+  const nameWithoutExt = path.basename(basename, ext);
+  
+  // Remove .redacted from the name
+  const originalName = nameWithoutExt.replace(/\.redacted$/, '');
+  
+  return path.join(dir, `${originalName}${ext}`);
+}
+
+/**
+ * Redacts secrets in a file by creating a new file with placeholders
+ * @param filePath - Path to the original file
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Path to the created redacted file, or null if no secrets were found
+ */
+export function redactSecretsInFile(filePath: string, secrets: SecretsMap): string | null {
+  let content = fs.readFileSync(filePath, 'utf8');
+  let changed = false;
+  
+  Object.entries(secrets).forEach(([id, data]) => {
+    // Handle both old format (string) and new format (object)
+    const secret = typeof data === 'string' ? data : data.secret;
+    const placeholder = generatePlaceholder(id, data);
+    
+    if (content.includes(secret)) {
+      content = content.split(secret).join(placeholder);
+      changed = true;
+    }
+  });
+  
+  if (changed) {
+    const redactedPath = getRedactedFilePath(filePath);
+    fs.writeFileSync(redactedPath, content, 'utf8');
+    return redactedPath;
+  }
+  return null;
+}
+
+/**
+ * Unredacts placeholders in a redacted file by creating a new file with real values
+ * @param redactedFilePath - Path to the redacted file
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Path to the created unredacted file, or null if no placeholders were found
+ */
+export function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): string | null {
+  let content = fs.readFileSync(redactedFilePath, 'utf8');
+  let changed = false;
+  
+  Object.entries(secrets).forEach(([id, data]) => {
+    // Handle both old format (string) and new format (object)
+    const secret = typeof data === 'string' ? data : data.secret;
+    const placeholder = generatePlaceholder(id, data);
+    
+    if (content.includes(placeholder)) {
+      content = content.split(placeholder).join(secret);
+      changed = true;
+    }
+  });
+  
+  if (changed) {
+    const originalPath = getOriginalFilePath(redactedFilePath);
+    fs.writeFileSync(originalPath, content, 'utf8');
+    return originalPath;
+  }
+  return null;
+}
+
+/**
+ * Adds a file path to .gitignore if it doesn't already exist there
+ * @param filePath - Path to the file to add to .gitignore
+ * @param gitRoot - Root directory of the git repository
+ * @returns true if the file was added, false if it already existed
+ */
+export function addToGitignore(filePath: string, gitRoot: string): boolean {
+  const gitignorePath = path.join(gitRoot, '.gitignore');
+  const relativePath = path.relative(gitRoot, filePath).replace(/\\/g, '/'); // Normalize path separators
+  
+  let gitignoreContent = '';
+  if (fs.existsSync(gitignorePath)) {
+    gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+  }
+  
+  // Check if the path already exists in .gitignore
+  const lines = gitignoreContent.split('\n').map(line => line.trim());
+  if (lines.includes(relativePath)) {
+    return false; // Already exists
+  }
+  
+  // Add the path to .gitignore
+  const newContent = gitignoreContent + (gitignoreContent && !gitignoreContent.endsWith('\n') ? '\n' : '') + relativePath + '\n';
+  fs.writeFileSync(gitignorePath, newContent, 'utf8');
+  return true; // Added
+}
+
+/**
  * Indexes files containing secrets
  * @param searchPath - Path to search for files
  * @param secrets - Map of UUIDs to secret data

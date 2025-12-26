@@ -90,6 +90,45 @@ export declare function encryptSecretsInFile(filePath: string, secrets: SecretsM
  */
 export declare function decryptSecretsInFile(filePath: string, secrets: SecretsMap): boolean;
 /**
+ * Generates a redacted file path by inserting ".redacted" before the file extension
+ * @param filePath - Original file path
+ * @returns Redacted file path (e.g., "file.json" -> "file.redacted.json")
+ */
+export declare function getRedactedFilePath(filePath: string): string;
+/**
+ * Checks if a file path represents a redacted file
+ * @param filePath - File path to check
+ * @returns true if the file is a redacted file
+ */
+export declare function isRedactedFile(filePath: string): boolean;
+/**
+ * Generates the original file path from a redacted file path
+ * @param redactedFilePath - Redacted file path
+ * @returns Original file path (e.g., "file.redacted.json" -> "file.json")
+ */
+export declare function getOriginalFilePath(redactedFilePath: string): string;
+/**
+ * Redacts secrets in a file by creating a new file with placeholders
+ * @param filePath - Path to the original file
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Path to the created redacted file, or null if no secrets were found
+ */
+export declare function redactSecretsInFile(filePath: string, secrets: SecretsMap): string | null;
+/**
+ * Unredacts placeholders in a redacted file by creating a new file with real values
+ * @param redactedFilePath - Path to the redacted file
+ * @param secrets - Map of UUIDs to secret data
+ * @returns Path to the created unredacted file, or null if no placeholders were found
+ */
+export declare function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): string | null;
+/**
+ * Adds a file path to .gitignore if it doesn't already exist there
+ * @param filePath - Path to the file to add to .gitignore
+ * @param gitRoot - Root directory of the git repository
+ * @returns true if the file was added, false if it already existed
+ */
+export declare function addToGitignore(filePath: string, gitRoot: string): boolean;
+/**
  * Indexes files containing secrets
  * @param searchPath - Path to search for files
  * @param secrets - Map of UUIDs to secret data
