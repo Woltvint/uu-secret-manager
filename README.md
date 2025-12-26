@@ -203,10 +203,10 @@ The CSV file will contain columns: UUID, Name, Secret, Description, Created, Pla
 
 Index files containing secrets to dramatically speed up encrypt/decrypt operations. The index stores which files contain secrets, so subsequent encrypt/decrypt commands only process those files instead of scanning the entire repository.
 
-**Default Behavior**: By default, the index command only indexes git-modified files (staged and unstaged changes). This makes it fast and efficient for incremental updates. Use `--all` to index all files in the repository.
+**Default Behavior**: By default, the index command only indexes git-modified files (staged and unstaged changes) and files listed in `.gitignore`. This makes it fast and efficient for incremental updates. Use `--all` to index all files in the repository.
 
 ```bash
-# Index git-modified files (default - fast incremental update)
+# Index git-modified and .gitignore files (default - fast incremental update)
 repo-secret-manager index
 
 # Index all files in repository
@@ -228,6 +228,16 @@ repo-secret-manager index ./src --all
 **Performance**: After indexing, encrypt/decrypt operations only process indexed files, making them significantly faster for large repositories.
 
 **Incremental Updates**: The default git-modified behavior makes it easy to keep your index up-to-date by only re-indexing files that have changed. When using git-modified mode, the tool merges results with the existing index, preserving entries for files that haven't been modified. Use `--all` to completely rebuild the index from scratch.
+
+### Clear Index
+
+Remove the index from the store. This is useful when you want to fully recreate the index from scratch.
+
+```bash
+repo-secret-manager clearindex
+```
+
+After clearing the index, run the `index` command to recreate it.
 
 ### Encrypt Secrets in Files
 

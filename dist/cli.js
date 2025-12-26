@@ -292,6 +292,51 @@ program
     }
 });
 program
+    .command('clearindex')
+    .description('Clear the index from the store. Use this to fully recreate the index afterwards.')
+    .action(async (_options, command) => {
+    try {
+        const globalOpts = command.parent.opts();
+        const repoPath = globalOpts.repo;
+        const gitRoot = findGitRoot(repoPath);
+        if (!gitRoot) {
+            console.error('Error: Not in a git repository');
+            process.exit(1);
+        }
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
+        const password = await vault.getPassword(globalOpts);
+        const decrypted = await vault.decryptVaultFile(secretsPath, password);
+        let store;
+        try {
+            store = JSON.parse(decrypted);
+            // Handle old format without index
+            if (!store.secrets) {
+                store = { secrets: store, index: undefined };
+            }
+        }
+        catch (err) {
+            console.error('Error: Could not parse secrets file');
+            process.exit(1);
+        }
+        // Check if index exists
+        if (!store.index || store.index.length === 0) {
+            console.log('No index found in the store.');
+            process.exit(0);
+        }
+        const indexCount = store.index.length;
+        // Clear the index
+        store.index = undefined;
+        // Save the updated store
+        await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
+        console.log(`Index cleared successfully (removed ${indexCount} indexed file(s)).`);
+        console.log('Run "index" command to recreate the index.');
+    }
+    catch (err) {
+        console.error('Error clearing index:', err.message);
+        process.exit(1);
+    }
+});
+program
     .command('add')
     .description('Add a secret to the store. Usage: add [name] <secret> [description]. If one parameter: secret value (name auto-generated). If two: name and secret. If three: name, secret, and description.')
     .argument('[args...]', 'Arguments: [name] <secret> [description]')
