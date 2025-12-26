@@ -38,6 +38,7 @@ exports.generatePlaceholder = generatePlaceholder;
 exports.findSecretByName = findSecretByName;
 exports.nameExists = nameExists;
 exports.findSecretByIdentifier = findSecretByIdentifier;
+exports.getGitignoreFiles = getGitignoreFiles;
 exports.getGitModifiedFiles = getGitModifiedFiles;
 exports.matchesPattern = matchesPattern;
 exports.isGitIgnored = isGitIgnored;
@@ -120,11 +121,67 @@ function findSecretByIdentifier(secrets, identifier) {
     return null;
 }
 /**
- * Gets list of modified files in git (staged and unstaged)
+ * Gets exact file paths from .gitignore (ignores patterns, directories, and comments)
  * @param gitRoot - Root directory of the git repository
- * @returns Array of absolute file paths that have been modified
+ * @returns Array of absolute file paths from .gitignore that are exact file matches
+ */
+function getGitignoreFiles(gitRoot) {
+    const gitignorePath = path.join(gitRoot, '.gitignore');
+    if (!fs.existsSync(gitignorePath)) {
+        return [];
+    }
+    try {
+        const content = fs.readFileSync(gitignorePath, 'utf8');
+        const lines = content.split('\n');
+        const files = [];
+        for (const line of lines) {
+            const trimmed = line.trim();
+            // Skip empty lines and comments
+            if (!trimmed || trimmed.startsWith('#')) {
+                continue;
+            }
+            // Skip patterns with wildcards (*, ?, [])
+            if (trimmed.includes('*') || trimmed.includes('?') || trimmed.includes('[')) {
+                continue;
+            }
+            // Skip directory paths (ending with /)
+            if (trimmed.endsWith('/')) {
+                continue;
+            }
+            // Skip negated patterns (starting with !)
+            if (trimmed.startsWith('!')) {
+                continue;
+            }
+            // This looks like an exact file path
+            const filePath = path.join(gitRoot, trimmed.replace(/\\/g, '/'));
+            // Verify it exists and is a file (not a directory)
+            if (fs.existsSync(filePath)) {
+                try {
+                    const stats = fs.statSync(filePath);
+                    if (stats.isFile()) {
+                        files.push(filePath);
+                    }
+                }
+                catch {
+                    // Skip if we can't stat the file
+                }
+            }
+        }
+        return files;
+    }
+    catch (err) {
+        // If reading .gitignore fails, return empty array
+        return [];
+    }
+}
+/**
+ * Gets list of modified files in git (staged and unstaged) plus files from .gitignore
+ * @param gitRoot - Root directory of the git repository
+ * @returns Array of absolute file paths that have been modified or are in .gitignore
  */
 function getGitModifiedFiles(gitRoot) {
+    const files = [];
+    // Get git-modified files
     try {
         // Get both staged and unstaged files
         const output = (0, child_process_1.execSync)('git diff --name-only HEAD && git diff --name-only --cached', {
@@ -132,20 +189,22 @@ function getGitModifiedFiles(gitRoot) {
             encoding: 'utf8',
             stdio: ['pipe', 'pipe', 'pipe']
         });
-        const files = output
+        const gitFiles = output
             .split('\n')
             .filter(f => f.trim())
             .map(f => path.join(gitRoot, f.trim()))
-            // Remove duplicates
-            .filter((file, index, self) => self.indexOf(file) === index)
             // Only include files that exist
             .filter(f => fs.existsSync(f) && fs.statSync(f).isFile());
-        return files;
+        files.push(...gitFiles);
     }
     catch (err) {
-        // If git command fails, return empty array
-        return [];
+        // If git command fails, continue with .gitignore files
     }
+    // Get files from .gitignore (exact file paths only)
+    const gitignoreFiles = getGitignoreFiles(gitRoot);
+    files.push(...gitignoreFiles);
+    // Remove duplicates and return
+    return files.filter((file, index, self) => self.indexOf(file) === index);
 }
 /**
  * Checks if a file path matches a glob pattern

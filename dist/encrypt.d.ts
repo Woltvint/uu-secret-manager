@@ -49,9 +49,15 @@ export declare function nameExists(secrets: SecretsMap, name: string): boolean;
  */
 export declare function findSecretByIdentifier(secrets: SecretsMap, identifier: string): [string, SecretData | string] | null;
 /**
- * Gets list of modified files in git (staged and unstaged)
+ * Gets exact file paths from .gitignore (ignores patterns, directories, and comments)
  * @param gitRoot - Root directory of the git repository
- * @returns Array of absolute file paths that have been modified
+ * @returns Array of absolute file paths from .gitignore that are exact file matches
+ */
+export declare function getGitignoreFiles(gitRoot: string): string[];
+/**
+ * Gets list of modified files in git (staged and unstaged) plus files from .gitignore
+ * @param gitRoot - Root directory of the git repository
+ * @returns Array of absolute file paths that have been modified or are in .gitignore
  */
 export declare function getGitModifiedFiles(gitRoot: string): string[];
 /**
