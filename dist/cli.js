@@ -721,12 +721,21 @@ program
                     if (encrypt.isRedactedFile(indexedFile.path)) {
                         return;
                     }
-                    const redactedPath = encrypt.redactSecretsInFile(indexedFile.path, secrets);
-                    if (redactedPath) {
-                        console.log(`Created redacted file: ${redactedPath}`);
-                        redactedFiles++;
-                        // Add original file to .gitignore if not disabled
-                        if (!cmdOptions.nogitignore) {
+                    const result = encrypt.redactSecretsInFile(indexedFile.path, secrets);
+                    if (result) {
+                        if (result.unchanged) {
+                            // File exists and content is the same, no logging needed
+                        }
+                        else if (result.created) {
+                            console.log(`Created redacted file: ${result.redactedPath}`);
+                            redactedFiles++;
+                        }
+                        else {
+                            console.log(`Updating redacted file: ${result.redactedPath}`);
+                            redactedFiles++;
+                        }
+                        // Add original file to .gitignore if not disabled (only if file was created or updated)
+                        if (!result.unchanged && !cmdOptions.nogitignore) {
                             if (encrypt.addToGitignore(indexedFile.path, gitRoot)) {
                                 gitignoreUpdated = true;
                             }
@@ -751,12 +760,21 @@ program
             if (stats.isFile()) {
                 // Skip if already a redacted file
                 if (!encrypt.isRedactedFile(searchPath)) {
-                    const redactedPath = encrypt.redactSecretsInFile(searchPath, secrets);
-                    if (redactedPath) {
-                        console.log(`Created redacted file: ${redactedPath}`);
-                        redactedFiles++;
-                        // Add original file to .gitignore if not disabled
-                        if (!cmdOptions.nogitignore) {
+                    const result = encrypt.redactSecretsInFile(searchPath, secrets);
+                    if (result) {
+                        if (result.unchanged) {
+                            // File exists and content is the same, no logging needed
+                        }
+                        else if (result.created) {
+                            console.log(`Created redacted file: ${result.redactedPath}`);
+                            redactedFiles++;
+                        }
+                        else {
+                            console.log(`Updating redacted file: ${result.redactedPath}`);
+                            redactedFiles++;
+                        }
+                        // Add original file to .gitignore if not disabled (only if file was created or updated)
+                        if (!result.unchanged && !cmdOptions.nogitignore) {
                             if (encrypt.addToGitignore(searchPath, gitRoot)) {
                                 gitignoreUpdated = true;
                             }
@@ -770,12 +788,21 @@ program
                     if (filePath === secretsPath || encrypt.isRedactedFile(filePath)) {
                         return;
                     }
-                    const redactedPath = encrypt.redactSecretsInFile(filePath, secrets);
-                    if (redactedPath) {
-                        console.log(`Created redacted file: ${redactedPath}`);
-                        redactedFiles++;
-                        // Add original file to .gitignore if not disabled
-                        if (!cmdOptions.nogitignore) {
+                    const result = encrypt.redactSecretsInFile(filePath, secrets);
+                    if (result) {
+                        if (result.unchanged) {
+                            // File exists and content is the same, no logging needed
+                        }
+                        else if (result.created) {
+                            console.log(`Created redacted file: ${result.redactedPath}`);
+                            redactedFiles++;
+                        }
+                        else {
+                            console.log(`Updating redacted file: ${result.redactedPath}`);
+                            redactedFiles++;
+                        }
+                        // Add original file to .gitignore if not disabled (only if file was created or updated)
+                        if (!result.unchanged && !cmdOptions.nogitignore) {
                             if (encrypt.addToGitignore(filePath, gitRoot)) {
                                 gitignoreUpdated = true;
                             }
@@ -835,10 +862,19 @@ program
         let unredactedFiles = 0;
         const processRedactedFile = (filePath) => {
             if (encrypt.isRedactedFile(filePath)) {
-                const unredactedPath = encrypt.unredactSecretsInFile(filePath, secrets);
-                if (unredactedPath) {
-                    console.log(`Created unredacted file: ${unredactedPath}`);
-                    unredactedFiles++;
+                const result = encrypt.unredactSecretsInFile(filePath, secrets);
+                if (result) {
+                    if (result.unchanged) {
+                        // File exists and content is the same, no logging needed
+                    }
+                    else if (result.created) {
+                        console.log(`Created unredacted file: ${result.originalPath}`);
+                        unredactedFiles++;
+                    }
+                    else {
+                        console.log(`Updating unredacted file: ${result.originalPath}`);
+                        unredactedFiles++;
+                    }
                 }
             }
         };

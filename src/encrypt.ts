@@ -358,12 +358,21 @@ export function getOriginalFilePath(redactedFilePath: string): string {
 }
 
 /**
+ * Result of redact operation
+ */
+export interface RedactResult {
+  redactedPath: string;
+  created: boolean;  // true if file was created, false if updated
+  unchanged: boolean; // true if file exists and content is unchanged
+}
+
+/**
  * Redacts secrets in a file by creating a new file with placeholders
  * @param filePath - Path to the original file
  * @param secrets - Map of UUIDs to secret data
- * @returns Path to the created redacted file, or null if no secrets were found
+ * @returns RedactResult with redacted path and status, or null if no secrets were found
  */
-export function redactSecretsInFile(filePath: string, secrets: SecretsMap): string | null {
+export function redactSecretsInFile(filePath: string, secrets: SecretsMap): RedactResult | null {
   let content = fs.readFileSync(filePath, 'utf8');
   let changed = false;
   
@@ -380,19 +389,50 @@ export function redactSecretsInFile(filePath: string, secrets: SecretsMap): stri
   
   if (changed) {
     const redactedPath = getRedactedFilePath(filePath);
-    fs.writeFileSync(redactedPath, content, 'utf8');
-    return redactedPath;
+    const fileExists = fs.existsSync(redactedPath);
+    let isUnchanged = false;
+    
+    if (fileExists) {
+      // Compare content with existing file
+      try {
+        const existingContent = fs.readFileSync(redactedPath, 'utf8');
+        isUnchanged = existingContent === content;
+      } catch {
+        // If we can't read the file, assume it needs updating
+        isUnchanged = false;
+      }
+    }
+    
+    // Only write if content is different
+    if (!isUnchanged) {
+      fs.writeFileSync(redactedPath, content, 'utf8');
+    }
+    
+    return {
+      redactedPath,
+      created: !fileExists,
+      unchanged: isUnchanged
+    };
   }
   return null;
+}
+
+/**
+ * Result of unredact operation
+ */
+export interface UnredactResult {
+  originalPath: string;
+  created: boolean;  // true if file was created, false if updated
+  unchanged: boolean; // true if file exists and content is unchanged
 }
 
 /**
  * Unredacts placeholders in a redacted file by creating a new file with real values
  * @param redactedFilePath - Path to the redacted file
  * @param secrets - Map of UUIDs to secret data
- * @returns Path to the created unredacted file, or null if no placeholders were found
+ * @returns UnredactResult with original path and status, or null if no placeholders were found
  */
-export function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): string | null {
+export function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): UnredactResult | null {
   let content = fs.readFileSync(redactedFilePath, 'utf8');
   let changed = false;
   
@@ -409,8 +449,30 @@ export function unredactSecretsInFile(redactedFilePath: string, secrets: Secrets
   
   if (changed) {
     const originalPath = getOriginalFilePath(redactedFilePath);
-    fs.writeFileSync(originalPath, content, 'utf8');
-    return originalPath;
+    const fileExists = fs.existsSync(originalPath);
+    let isUnchanged = false;
+    
+    if (fileExists) {
+      // Compare content with existing file
+      try {
+        const existingContent = fs.readFileSync(originalPath, 'utf8');
+        isUnchanged = existingContent === content;
+      } catch {
+        // If we can't read the file, assume it needs updating
+        isUnchanged = false;
+      }
+    }
+    
+    // Only write if content is different
+    if (!isUnchanged) {
+      fs.writeFileSync(originalPath, content, 'utf8');
+    }
+    
+    return {
+      originalPath,
+      created: !fileExists,
+      unchanged: isUnchanged
+    };
   }
   return null;
 }

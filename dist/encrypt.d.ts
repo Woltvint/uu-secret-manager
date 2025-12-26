@@ -114,19 +114,35 @@ export declare function isRedactedFile(filePath: string): boolean;
  */
 export declare function getOriginalFilePath(redactedFilePath: string): string;
 /**
+ * Result of redact operation
+ */
+export interface RedactResult {
+    redactedPath: string;
+    created: boolean;
+    unchanged: boolean;
+}
+/**
  * Redacts secrets in a file by creating a new file with placeholders
  * @param filePath - Path to the original file
  * @param secrets - Map of UUIDs to secret data
- * @returns Path to the created redacted file, or null if no secrets were found
+ * @returns RedactResult with redacted path and status, or null if no secrets were found
  */
-export declare function redactSecretsInFile(filePath: string, secrets: SecretsMap): string | null;
+export declare function redactSecretsInFile(filePath: string, secrets: SecretsMap): RedactResult | null;
+/**
+ * Result of unredact operation
+ */
+export interface UnredactResult {
+    originalPath: string;
+    created: boolean;
+    unchanged: boolean;
+}
 /**
  * Unredacts placeholders in a redacted file by creating a new file with real values
  * @param redactedFilePath - Path to the redacted file
  * @param secrets - Map of UUIDs to secret data
- * @returns Path to the created unredacted file, or null if no placeholders were found
+ * @returns UnredactResult with original path and status, or null if no placeholders were found
  */
-export declare function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): string | null;
+export declare function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): UnredactResult | null;
 /**
  * Adds a file path to .gitignore if it doesn't already exist there
  * @param filePath - Path to the file to add to .gitignore
