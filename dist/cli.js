@@ -40,6 +40,7 @@ const fs = __importStar(require("fs"));
 const vault = __importStar(require("./vault"));
 const uuid_1 = require("uuid");
 const encrypt = __importStar(require("./encrypt"));
+const encrypt_1 = require("./encrypt");
 const program = new commander_1.Command();
 /**
  * Finds the root directory of a git repository
@@ -86,8 +87,9 @@ Password Options (in priority order):
   4. prompt: Interactive password prompt (default)
 
 Examples:
-  $ echo "mypassword" | rsm add "my_secret" "Database password"
-  $ rsm add "api_key_123"  # Without description
+  $ echo "mypassword" | rsm add "db_password" "my_secret" "Database password"
+  $ rsm add "api_key_123"  # Without name (auto-generated)
+  $ rsm add "db_password" "my_secret"  # With name, without description
   $ rsm -f ~/.vault-pass list
   $ rsm -p mypassword encrypt
 `);
@@ -119,12 +121,17 @@ program
         }
         console.log('Secrets:');
         console.log('━'.repeat(80));
-        Object.entries(secrets).forEach(([uuid, data]) => {
+        Object.entries(secrets).forEach(([id, data]) => {
             // Handle both old format (string) and new format (object)
             const secret = typeof data === 'string' ? data : data.secret;
             const description = typeof data === 'object' ? data.description : '';
             const created = typeof data === 'object' ? data.created : '';
-            console.log(`\nUUID: ${uuid}`);
+            const name = typeof data === 'object' ? data.name : undefined;
+            const placeholder = (0, encrypt_1.generatePlaceholder)(id, data);
+            console.log(`\nUUID: ${id}`);
+            if (name) {
+                console.log(`Name: ${name}`);
+            }
             console.log(`Secret: ${secret}`);
             if (description) {
                 console.log(`Description: ${description}`);
@@ -132,7 +139,7 @@ program
             if (created) {
                 console.log(`Created: ${new Date(created).toLocaleString()}`);
             }
-            console.log(`Placeholder: <!secret_${uuid}!>`);
+            console.log(`Placeholder: ${placeholder}`);
         });
         console.log('\n' + '━'.repeat(80));
         console.log(`Total secrets: ${Object.keys(secrets).length}`);
@@ -169,12 +176,13 @@ program
             process.exit(1);
         }
         // Build CSV content
-        const csvLines = ['UUID,Secret,Description,Created,Placeholder'];
-        Object.entries(secrets).forEach(([uuid, data]) => {
+        const csvLines = ['UUID,Name,Secret,Description,Created,Placeholder'];
+        Object.entries(secrets).forEach(([id, data]) => {
             const secret = typeof data === 'string' ? data : data.secret;
             const description = typeof data === 'object' ? data.description || '' : '';
             const created = typeof data === 'object' ? data.created || '' : '';
-            const placeholder = `<!secret_${uuid}!>`;
+            const name = typeof data === 'object' ? data.name || '' : '';
+            const placeholder = (0, encrypt_1.generatePlaceholder)(id, data);
             // Escape CSV values (handle commas and quotes)
             const escapeCsv = (value) => {
                 if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -183,7 +191,8 @@ program
                 return value;
             };
             csvLines.push([
-                escapeCsv(uuid),
+                escapeCsv(id),
+                escapeCsv(name),
                 escapeCsv(secret),
                 escapeCsv(description),
                 escapeCsv(created),
@@ -283,10 +292,41 @@ program
     }
 });
 program
-    .command('add <secret> [description]')
-    .description('Add a secret to the store with optional description')
-    .action(async (secret, description, _options, command) => {
+    .command('add')
+    .description('Add a secret to the store. Usage: add [name] <secret> [description]. If one parameter: secret value (name auto-generated). If two: name and secret. If three: name, secret, and description.')
+    .argument('[args...]', 'Arguments: [name] <secret> [description]')
+    .action(async (args, _options, command) => {
     try {
+        // Parse arguments based on count
+        let customName;
+        let secret;
+        let desc;
+        if (args.length === 0) {
+            console.error('Error: Secret value is required');
+            console.error('Usage: add [name] <secret> [description]');
+            console.error('  - One parameter: secret value (name auto-generated)');
+            console.error('  - Two parameters: name and secret value');
+            console.error('  - Three parameters: name, secret value, and description');
+            process.exit(1);
+        }
+        else if (args.length === 1) {
+            // Only one argument provided: it's the secret value
+            secret = args[0];
+            customName = undefined;
+            desc = undefined;
+        }
+        else if (args.length === 2) {
+            // Two arguments provided: first is name, second is secret
+            customName = args[0];
+            secret = args[1];
+            desc = undefined;
+        }
+        else {
+            // Three or more arguments: first is name, second is secret, third is description
+            customName = args[0];
+            secret = args[1];
+            desc = args[2];
+        }
         const globalOpts = command.parent.opts();
         const repoPath = globalOpts.repo;
         const secretsPath = getSecretsPath(repoPath);
@@ -304,29 +344,117 @@ program
             // If file doesn't exist or is empty, start fresh
             store = { secrets: {}, index: undefined };
         }
-        // Check for duplicate secret
+        // Check for duplicate secret value
         for (const [existingUuid, data] of Object.entries(store.secrets)) {
             const existingSecret = typeof data === 'string' ? data : data.secret;
             if (existingSecret === secret) {
-                console.error(`Error: Secret already exists with UUID: ${existingUuid}`);
-                console.error(`Use the existing placeholder: <!secret_${existingUuid}!>`);
+                const placeholder = (0, encrypt_1.generatePlaceholder)(existingUuid, data);
+                console.error(`Error: Secret already exists`);
+                console.error(`Use the existing placeholder: ${placeholder}`);
+                process.exit(1);
+            }
+        }
+        // Check if custom name is provided and if it already exists
+        if (customName) {
+            // Validate name format (alphanumeric, underscore, hyphen)
+            if (!/^[a-zA-Z0-9_-]+$/.test(customName)) {
+                console.error('Error: Name must contain only alphanumeric characters, underscores, or hyphens');
+                process.exit(1);
+            }
+            if ((0, encrypt_1.nameExists)(store.secrets, customName)) {
+                console.error(`Error: A secret with name "${customName}" already exists`);
+                console.error('Use "modify" command to update an existing secret, or choose a different name');
                 process.exit(1);
             }
         }
         const uuid = (0, uuid_1.v4)();
-        store.secrets[uuid] = {
+        const secretData = {
             secret: secret,
-            description: description || '',
+            description: desc || '',
             created: new Date().toISOString()
         };
+        // Add custom name if provided
+        if (customName) {
+            secretData.name = customName;
+        }
+        store.secrets[uuid] = secretData;
         await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
-        console.log(`Secret added with placeholder: <!secret_${uuid}!>`);
-        if (description) {
-            console.log(`Description: ${description}`);
+        const placeholder = (0, encrypt_1.generatePlaceholder)(uuid, secretData);
+        console.log(`Secret added with placeholder: ${placeholder}`);
+        if (desc) {
+            console.log(`Description: ${desc}`);
+        }
+        if (customName) {
+            console.log(`Name: ${customName}`);
         }
     }
     catch (err) {
         console.error('Error adding secret:', err.message);
+        process.exit(1);
+    }
+});
+program
+    .command('modify <name> <secret> [description]')
+    .description('Modify an existing secret by its custom name')
+    .action(async (name, secret, description, _options, command) => {
+    try {
+        const globalOpts = command.parent.opts();
+        const repoPath = globalOpts.repo;
+        const secretsPath = getSecretsPath(repoPath);
+        const password = await vault.getPassword(globalOpts);
+        let store = { secrets: {}, index: undefined };
+        try {
+            const decrypted = await vault.decryptVaultFile(secretsPath, password);
+            store = JSON.parse(decrypted);
+            // Handle old format without index
+            if (!store.secrets) {
+                store = { secrets: store, index: undefined };
+            }
+        }
+        catch (err) {
+            console.error('Error: Could not load secrets file');
+            console.error('Make sure the secrets file exists and the password is correct');
+            process.exit(1);
+        }
+        // Find the secret by name
+        const found = (0, encrypt_1.findSecretByName)(store.secrets, name);
+        if (!found) {
+            console.error(`Error: No secret found with name "${name}"`);
+            console.error('Use "list" command to see all available secrets');
+            process.exit(1);
+        }
+        const [id, oldData] = found;
+        const oldSecret = typeof oldData === 'string' ? oldData : oldData.secret;
+        // Update the secret value
+        if (typeof oldData === 'string') {
+            // Convert old format to new format
+            store.secrets[id] = {
+                secret: secret,
+                description: description || '',
+                created: new Date().toISOString(),
+                name: name
+            };
+        }
+        else {
+            // Update existing object
+            store.secrets[id] = {
+                ...oldData,
+                secret: secret,
+                description: description !== undefined ? description : oldData.description || '',
+                name: name
+            };
+        }
+        await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
+        const placeholder = (0, encrypt_1.generatePlaceholder)(id, store.secrets[id]);
+        console.log(`Secret "${name}" modified successfully`);
+        console.log(`Placeholder: ${placeholder}`);
+        if (description !== undefined) {
+            console.log(`Description: ${description}`);
+        }
+        console.log(`Previous value: ${oldSecret.substring(0, 20)}${oldSecret.length > 20 ? '...' : ''}`);
+    }
+    catch (err) {
+        console.error('Error modifying secret:', err.message);
         process.exit(1);
     }
 });

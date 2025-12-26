@@ -6,6 +6,7 @@ export interface SecretData {
   secret: string;
   description?: string;
   created?: string;
+  name?: string;  // Optional custom name for the placeholder (instead of UUID)
 }
 
 export interface IndexedFile {
@@ -19,6 +20,55 @@ export interface SecretsStore {
 }
 
 export type SecretsMap = Record<string, SecretData | string>;
+
+/**
+ * Gets the placeholder identifier for a secret (name if available, otherwise UUID)
+ * @param id - UUID or key for the secret
+ * @param data - Secret data (string or SecretData object)
+ * @returns Placeholder identifier (name or UUID)
+ */
+export function getPlaceholderId(id: string, data: SecretData | string): string {
+  if (typeof data === 'object' && data.name) {
+    return data.name;
+  }
+  return id;
+}
+
+/**
+ * Generates a placeholder string for a secret
+ * @param id - UUID or key for the secret
+ * @param data - Secret data (string or SecretData object)
+ * @returns Placeholder string in format <!secret_{id}!
+ */
+export function generatePlaceholder(id: string, data: SecretData | string): string {
+  const placeholderId = getPlaceholderId(id, data);
+  return `<!secret_${placeholderId}!>`;
+}
+
+/**
+ * Finds a secret entry by its custom name
+ * @param secrets - Map of secrets
+ * @param name - Custom name to search for
+ * @returns Tuple of [id, data] if found, null otherwise
+ */
+export function findSecretByName(secrets: SecretsMap, name: string): [string, SecretData | string] | null {
+  for (const [id, data] of Object.entries(secrets)) {
+    if (typeof data === 'object' && data.name === name) {
+      return [id, data];
+    }
+  }
+  return null;
+}
+
+/**
+ * Checks if a name already exists in the secrets map
+ * @param secrets - Map of secrets
+ * @param name - Custom name to check
+ * @returns true if name exists, false otherwise
+ */
+export function nameExists(secrets: SecretsMap, name: string): boolean {
+  return findSecretByName(secrets, name) !== null;
+}
 
 /**
  * Gets list of modified files in git (staged and unstaged)
@@ -129,10 +179,10 @@ export function encryptSecretsInFile(filePath: string, secrets: SecretsMap): boo
   let content = fs.readFileSync(filePath, 'utf8');
   let changed = false;
   
-  Object.entries(secrets).forEach(([uuid, data]) => {
+  Object.entries(secrets).forEach(([id, data]) => {
     // Handle both old format (string) and new format (object)
     const secret = typeof data === 'string' ? data : data.secret;
-    const placeholder = `<!secret_${uuid}!>`;
+    const placeholder = generatePlaceholder(id, data);
     
     if (content.includes(secret)) {
       content = content.split(secret).join(placeholder);
@@ -157,10 +207,10 @@ export function decryptSecretsInFile(filePath: string, secrets: SecretsMap): boo
   let content = fs.readFileSync(filePath, 'utf8');
   let changed = false;
   
-  Object.entries(secrets).forEach(([uuid, data]) => {
+  Object.entries(secrets).forEach(([id, data]) => {
     // Handle both old format (string) and new format (object)
     const secret = typeof data === 'string' ? data : data.secret;
-    const placeholder = `<!secret_${uuid}!>`;
+    const placeholder = generatePlaceholder(id, data);
     
     if (content.includes(placeholder)) {
       content = content.split(placeholder).join(secret);
@@ -204,10 +254,10 @@ export function indexFiles(
       const secretIds: string[] = [];
       
       // Check which secrets are in this file
-      Object.entries(secrets).forEach(([uuid, data]) => {
+      Object.entries(secrets).forEach(([id, data]) => {
         const secret = typeof data === 'string' ? data : data.secret;
         if (content.includes(secret)) {
-          secretIds.push(uuid);
+          secretIds.push(id);
         }
       });
       

@@ -2,6 +2,7 @@ export interface SecretData {
     secret: string;
     description?: string;
     created?: string;
+    name?: string;
 }
 export interface IndexedFile {
     path: string;
@@ -12,6 +13,34 @@ export interface SecretsStore {
     index?: IndexedFile[];
 }
 export type SecretsMap = Record<string, SecretData | string>;
+/**
+ * Gets the placeholder identifier for a secret (name if available, otherwise UUID)
+ * @param id - UUID or key for the secret
+ * @param data - Secret data (string or SecretData object)
+ * @returns Placeholder identifier (name or UUID)
+ */
+export declare function getPlaceholderId(id: string, data: SecretData | string): string;
+/**
+ * Generates a placeholder string for a secret
+ * @param id - UUID or key for the secret
+ * @param data - Secret data (string or SecretData object)
+ * @returns Placeholder string in format <!secret_{id}!
+ */
+export declare function generatePlaceholder(id: string, data: SecretData | string): string;
+/**
+ * Finds a secret entry by its custom name
+ * @param secrets - Map of secrets
+ * @param name - Custom name to search for
+ * @returns Tuple of [id, data] if found, null otherwise
+ */
+export declare function findSecretByName(secrets: SecretsMap, name: string): [string, SecretData | string] | null;
+/**
+ * Checks if a name already exists in the secrets map
+ * @param secrets - Map of secrets
+ * @param name - Custom name to check
+ * @returns true if name exists, false otherwise
+ */
+export declare function nameExists(secrets: SecretsMap, name: string): boolean;
 /**
  * Gets list of modified files in git (staged and unstaged)
  * @param gitRoot - Root directory of the git repository

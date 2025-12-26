@@ -33,6 +33,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getPlaceholderId = getPlaceholderId;
+exports.generatePlaceholder = generatePlaceholder;
+exports.findSecretByName = findSecretByName;
+exports.nameExists = nameExists;
 exports.getGitModifiedFiles = getGitModifiedFiles;
 exports.matchesPattern = matchesPattern;
 exports.isGitIgnored = isGitIgnored;
@@ -45,6 +49,51 @@ exports.decryptIndexedFiles = decryptIndexedFiles;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const child_process_1 = require("child_process");
+/**
+ * Gets the placeholder identifier for a secret (name if available, otherwise UUID)
+ * @param id - UUID or key for the secret
+ * @param data - Secret data (string or SecretData object)
+ * @returns Placeholder identifier (name or UUID)
+ */
+function getPlaceholderId(id, data) {
+    if (typeof data === 'object' && data.name) {
+        return data.name;
+    }
+    return id;
+}
+/**
+ * Generates a placeholder string for a secret
+ * @param id - UUID or key for the secret
+ * @param data - Secret data (string or SecretData object)
+ * @returns Placeholder string in format <!secret_{id}!
+ */
+function generatePlaceholder(id, data) {
+    const placeholderId = getPlaceholderId(id, data);
+    return `<!secret_${placeholderId}!>`;
+}
+/**
+ * Finds a secret entry by its custom name
+ * @param secrets - Map of secrets
+ * @param name - Custom name to search for
+ * @returns Tuple of [id, data] if found, null otherwise
+ */
+function findSecretByName(secrets, name) {
+    for (const [id, data] of Object.entries(secrets)) {
+        if (typeof data === 'object' && data.name === name) {
+            return [id, data];
+        }
+    }
+    return null;
+}
+/**
+ * Checks if a name already exists in the secrets map
+ * @param secrets - Map of secrets
+ * @param name - Custom name to check
+ * @returns true if name exists, false otherwise
+ */
+function nameExists(secrets, name) {
+    return findSecretByName(secrets, name) !== null;
+}
 /**
  * Gets list of modified files in git (staged and unstaged)
  * @param gitRoot - Root directory of the git repository
@@ -145,10 +194,10 @@ function walkDir(dir, callback, gitRoot) {
 function encryptSecretsInFile(filePath, secrets) {
     let content = fs.readFileSync(filePath, 'utf8');
     let changed = false;
-    Object.entries(secrets).forEach(([uuid, data]) => {
+    Object.entries(secrets).forEach(([id, data]) => {
         // Handle both old format (string) and new format (object)
         const secret = typeof data === 'string' ? data : data.secret;
-        const placeholder = `<!secret_${uuid}!>`;
+        const placeholder = generatePlaceholder(id, data);
         if (content.includes(secret)) {
             content = content.split(secret).join(placeholder);
             changed = true;
@@ -169,10 +218,10 @@ function encryptSecretsInFile(filePath, secrets) {
 function decryptSecretsInFile(filePath, secrets) {
     let content = fs.readFileSync(filePath, 'utf8');
     let changed = false;
-    Object.entries(secrets).forEach(([uuid, data]) => {
+    Object.entries(secrets).forEach(([id, data]) => {
         // Handle both old format (string) and new format (object)
         const secret = typeof data === 'string' ? data : data.secret;
-        const placeholder = `<!secret_${uuid}!>`;
+        const placeholder = generatePlaceholder(id, data);
         if (content.includes(placeholder)) {
             content = content.split(placeholder).join(secret);
             changed = true;
@@ -204,10 +253,10 @@ function indexFiles(searchPath, secrets, pattern, gitRoot, specificFiles) {
             const content = fs.readFileSync(filePath, 'utf8');
             const secretIds = [];
             // Check which secrets are in this file
-            Object.entries(secrets).forEach(([uuid, data]) => {
+            Object.entries(secrets).forEach(([id, data]) => {
                 const secret = typeof data === 'string' ? data : data.secret;
                 if (content.includes(secret)) {
-                    secretIds.push(uuid);
+                    secretIds.push(id);
                 }
             });
             // Only index files that contain secrets
