@@ -361,13 +361,33 @@ export function addToGitignore(filePath: string, gitRoot: string): boolean {
   }
   
   // Check if the path already exists in .gitignore
-  const lines = gitignoreContent.split('\n').map(line => line.trim());
-  if (lines.includes(relativePath)) {
+  // Since comments are on separate lines, we only need to check for exact path matches
+  // Lines starting with # are comments and are ignored (they don't count as matches)
+  const lines = gitignoreContent.split('\n');
+  
+  const pathExists = lines.some(line => {
+    const trimmed = line.trim();
+    
+    // Skip commented lines - they don't count as matches
+    if (trimmed.startsWith('#')) {
+      return false;
+    }
+    
+    // Check for exact match (comments are on separate lines, so no need for complex matching)
+    return trimmed === relativePath;
+  });
+  
+  if (pathExists) {
     return false; // Already exists
   }
   
-  // Add the path to .gitignore
-  const newContent = gitignoreContent + (gitignoreContent && !gitignoreContent.endsWith('\n') ? '\n' : '') + relativePath + '\n';
+  // Add the path to .gitignore with a comment on a separate line before the path
+  const comment = `# Added by repo-secret-manager (redacted version is stored in git)`;
+  
+  // Ensure there's a newline at the end of existing content
+  const separator = gitignoreContent && !gitignoreContent.endsWith('\n') ? '\n' : '';
+  const entry = separator + comment + '\n' + relativePath + '\n';
+  const newContent = gitignoreContent + entry;
   fs.writeFileSync(gitignorePath, newContent, 'utf8');
   return true; // Added
 }
