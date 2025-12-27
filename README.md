@@ -12,6 +12,7 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Modify existing secrets by their custom name
 - Delete secrets by their custom name or UUID
 - **Index files** for dramatically faster encrypt/decrypt operations (includes `.gitignore` files)
+- **List index** to view all indexed files and their contained secrets
 - Encrypt secrets in files with placeholders (`<!secret_{uuid}!>` or `<!secret_{name}!>`) - in-place replacement
 - Decrypt placeholders back to original secrets - in-place replacement
 - Redact secrets by creating separate files with `.redacted` suffix (e.g., `file.json` -> `file.redacted.json`)
@@ -232,6 +233,34 @@ repo-secret-manager index ./src --all
 **Performance**: After indexing, encrypt/decrypt operations only process indexed files, making them significantly faster for large repositories.
 
 **Incremental Updates**: The default git-modified behavior makes it easy to keep your index up-to-date by only re-indexing files that have changed. When using git-modified mode, the tool merges results with the existing index, preserving entries for files that haven't been modified. Use `--all` to completely rebuild the index from scratch.
+
+### List Index
+
+Display the contents of the index file, showing all indexed files and the secrets they contain.
+
+```bash
+repo-secret-manager listindex
+```
+
+Example output:
+```
+Index contents:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total indexed files: 2
+
+1. src/config.json
+   Secrets: 2
+   IDs: db-password, api-key
+
+2. config/secrets.yaml
+   Secrets: 1
+   IDs: 550e8400-e29b-41d4-a716-446655440000
+```
+
+**Notes:**
+- Shows file paths relative to the git repository root
+- Displays custom names for secrets if available, otherwise shows UUIDs
+- If no index exists, suggests running the `index` command
 
 ### Clear Index
 

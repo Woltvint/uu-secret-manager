@@ -311,6 +311,71 @@ program
     }
 });
 program
+    .command('listindex')
+    .description('List the content of the index file')
+    .action(async (_options, command) => {
+    try {
+        const globalOpts = command.parent.opts();
+        const repoPath = globalOpts.repo;
+        const gitRoot = findGitRoot(repoPath);
+        if (!gitRoot) {
+            console.error('Error: Not in a git repository');
+            process.exit(1);
+        }
+        const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
+        const vaultExists = fs.existsSync(secretsPath);
+        if (!vaultExists) {
+            console.error('Error: Vault file does not exist');
+            console.error('Create a vault by adding a secret with: rsm add <secret>');
+            process.exit(1);
+        }
+        const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
+        const decrypted = await vault.decryptVaultFile(secretsPath, password);
+        let store;
+        try {
+            store = JSON.parse(decrypted);
+            // Handle old format without index
+            if (!store.secrets) {
+                store = { secrets: store, index: undefined };
+            }
+        }
+        catch (err) {
+            console.error('Error: Could not parse secrets file');
+            process.exit(1);
+        }
+        // Check if index exists
+        if (!store.index || store.index.length === 0) {
+            console.log('No index found in the store.');
+            console.log('Run "index" command to create an index.');
+            process.exit(0);
+        }
+        console.log('Index contents:');
+        console.log('━'.repeat(80));
+        console.log(`Total indexed files: ${store.index.length}\n`);
+        store.index.forEach((indexedFile, index) => {
+            console.log(`${index + 1}. ${indexedFile.path}`);
+            console.log(`   Secrets: ${indexedFile.secretIds.length}`);
+            if (indexedFile.secretIds.length > 0) {
+                // Show secret IDs (names if available, otherwise UUIDs)
+                const secretNames = indexedFile.secretIds.map(id => {
+                    const secretData = store.secrets[id];
+                    if (secretData) {
+                        const data = typeof secretData === 'string' ? { secret: secretData } : secretData;
+                        return data.name || id;
+                    }
+                    return id;
+                });
+                console.log(`   IDs: ${secretNames.join(', ')}`);
+            }
+            console.log('');
+        });
+    }
+    catch (err) {
+        console.error('Error listing index:', err.message);
+        process.exit(1);
+    }
+});
+program
     .command('clearindex')
     .description('Clear the index from the store. Use this to fully recreate the index afterwards.')
     .action(async (_options, command) => {
