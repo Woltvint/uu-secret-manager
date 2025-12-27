@@ -73,7 +73,13 @@ program
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
       const secretsPath = getSecretsPath(repoPath);
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
@@ -132,7 +138,13 @@ program
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
       const secretsPath = getSecretsPath(repoPath);
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
@@ -206,7 +218,13 @@ program
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
       
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       
@@ -296,7 +314,13 @@ program
       
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
       
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       
@@ -371,19 +395,23 @@ program
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
       const secretsPath = getSecretsPath(repoPath);
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      const password = await vault.getPassword({ ...globalOpts, vaultExists }, secretsPath);
       let store: SecretsStore = { secrets: {}, index: undefined };
       
-      try {
-        const decrypted = await vault.decryptVaultFile(secretsPath, password);
-        store = JSON.parse(decrypted);
-        // Handle old format without index
-        if (!store.secrets) {
-          store = { secrets: store as any, index: undefined };
+      if (vaultExists) {
+        try {
+          const decrypted = await vault.decryptVaultFile(secretsPath, password);
+          store = JSON.parse(decrypted);
+          // Handle old format without index
+          if (!store.secrets) {
+            store = { secrets: store as any, index: undefined };
+          }
+        } catch (err) {
+          console.error('Error: Could not decrypt vault file');
+          console.error('Make sure the password is correct');
+          process.exit(1);
         }
-      } catch (err) {
-        // If file doesn't exist or is empty, start fresh
-        store = { secrets: {}, index: undefined };
       }
       
       // Check for duplicate secret value
@@ -449,7 +477,13 @@ program
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
       const secretsPath = getSecretsPath(repoPath);
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       let store: SecretsStore = { secrets: {}, index: undefined };
       
       try {
@@ -517,7 +551,13 @@ program
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
       const secretsPath = getSecretsPath(repoPath);
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       let store: SecretsStore = { secrets: {}, index: undefined };
       
       try {
@@ -584,7 +624,13 @@ program
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
       
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
@@ -675,7 +721,13 @@ program
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
       
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
@@ -761,7 +813,13 @@ program
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
       
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
@@ -941,7 +999,13 @@ program
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
       
-      const password = await vault.getPassword(globalOpts);
+      const vaultExists = fs.existsSync(secretsPath);
+      if (!vaultExists) {
+        console.error('Error: Vault file does not exist');
+        console.error('Create a vault by adding a secret with: rsm add <secret>');
+        process.exit(1);
+      }
+      const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;

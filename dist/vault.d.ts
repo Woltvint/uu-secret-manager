@@ -1,14 +1,16 @@
 export interface VaultOptions {
     password?: string;
     passwordFile?: string;
+    vaultExists?: boolean;
 }
 /**
  * Gets vault password from various sources with priority order:
  * 1. Password file, 2. Password parameter, 3. Stdin, 4. Interactive prompt
  * @param options - Vault options containing password sources
+ * @param vaultPath - Optional path to vault file for validation
  * @returns Promise resolving to the password
  */
-export declare function getPassword(options?: VaultOptions): Promise<string>;
+export declare function getPassword(options?: VaultOptions, vaultPath?: string): Promise<string>;
 /**
  * Decrypts an ansible-vault encrypted file
  * @param vaultPath - Path to the encrypted vault file

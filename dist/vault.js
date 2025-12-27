@@ -105,31 +105,96 @@ function readPasswordFromStdin() {
  * Gets vault password from various sources with priority order:
  * 1. Password file, 2. Password parameter, 3. Stdin, 4. Interactive prompt
  * @param options - Vault options containing password sources
+ * @param vaultPath - Optional path to vault file for validation
  * @returns Promise resolving to the password
  */
-async function getPassword(options = {}) {
+async function getPassword(options = {}, vaultPath) {
     // Priority: 1. Password file, 2. Password param, 3. Stdin, 4. Prompt
     // 1. Check password file
     if (options.passwordFile) {
         try {
             const password = fs.readFileSync(options.passwordFile, 'utf8').trim();
+            // Validate password if vault exists
+            if (vaultPath && fs.existsSync(vaultPath) && options.vaultExists !== false) {
+                try {
+                    await validatePassword(vaultPath, password);
+                }
+                catch (err) {
+                    throw new Error('Invalid password in password file');
+                }
+            }
             return password;
         }
         catch (err) {
+            if (err.message === 'Invalid password in password file') {
+                throw err;
+            }
             throw new Error(`Failed to read password file: ${err.message}`);
         }
     }
     // 2. Check password parameter
     if (options.password) {
+        // Validate password if vault exists
+        if (vaultPath && fs.existsSync(vaultPath) && options.vaultExists !== false) {
+            try {
+                await validatePassword(vaultPath, options.password);
+            }
+            catch (err) {
+                throw new Error('Invalid password provided');
+            }
+        }
         return options.password;
     }
     // 3. Check stdin (if piped)
     const stdinPassword = await readPasswordFromStdin();
     if (stdinPassword) {
+        // Validate password if vault exists
+        if (vaultPath && fs.existsSync(vaultPath) && options.vaultExists !== false) {
+            try {
+                await validatePassword(vaultPath, stdinPassword);
+            }
+            catch (err) {
+                throw new Error('Invalid password from stdin');
+            }
+        }
         return stdinPassword;
     }
-    // 4. Prompt user
-    return await promptPassword('Vault password: ');
+    // 4. Prompt user with appropriate message
+    const vaultExists = vaultPath ? fs.existsSync(vaultPath) : (options.vaultExists ?? false);
+    const promptMessage = vaultExists
+        ? 'Vault password: '
+        : 'New vault password: ';
+    let password = await promptPassword(promptMessage);
+    // If vault exists, validate the password (with retry on failure)
+    if (vaultExists && options.vaultExists !== false) {
+        while (true) {
+            try {
+                await validatePassword(vaultPath, password);
+                break; // Password is correct
+            }
+            catch (err) {
+                console.error('Error: Incorrect password. Please try again.');
+                password = await promptPassword('Vault password: ');
+            }
+        }
+    }
+    return password;
+}
+/**
+ * Validates a password by attempting to decrypt the vault file
+ * @param vaultPath - Path to the vault file
+ * @param password - Password to validate
+ * @throws Error if password is incorrect
+ */
+async function validatePassword(vaultPath, password) {
+    try {
+        const vault = new ansible_vault_1.Vault({ password });
+        const encryptedContent = fs.readFileSync(vaultPath, 'utf8');
+        await vault.decrypt(encryptedContent, undefined);
+    }
+    catch (err) {
+        throw new Error('Invalid password');
+    }
 }
 /**
  * Decrypts an ansible-vault encrypted file
