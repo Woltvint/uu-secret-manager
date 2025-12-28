@@ -202,6 +202,195 @@ program
   });
 
 program
+  .command('import <csvPath>')
+  .description('Import secrets from a CSV file (created by export command)')
+  .action(async (csvPath: string, _options, command) => {
+    try {
+      const globalOpts = command.parent!.opts();
+      const repoPath = globalOpts.repo;
+      const gitRoot = findGitRoot(repoPath);
+      if (!gitRoot) {
+        console.error('Error: Not in a git repository');
+        process.exit(1);
+      }
+      
+      const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
+      const vaultExists = fs.existsSync(secretsPath);
+      
+      // Load existing vault if it exists
+      let store: SecretsStore;
+      let existingSecrets: SecretsMap = {};
+      
+      if (vaultExists) {
+        // Load existing vault
+        const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
+        const decrypted = await vault.decryptVaultFile(secretsPath, password);
+        
+        try {
+          store = JSON.parse(decrypted);
+          // Handle old format without index
+          if (!store.secrets) {
+            store = { secrets: store as any, index: store.index };
+          }
+          existingSecrets = store.secrets;
+        } catch (err) {
+          console.error('Error: Could not parse existing vault file');
+          process.exit(1);
+        }
+      } else {
+        // Create new vault
+        store = {
+          secrets: {},
+          index: undefined
+        };
+      }
+      
+      // Read and parse CSV file
+      const resolvedPath = path.resolve(csvPath);
+      if (!fs.existsSync(resolvedPath)) {
+        console.error(`Error: CSV file not found: ${resolvedPath}`);
+        process.exit(1);
+      }
+      
+      const csvContent = fs.readFileSync(resolvedPath, 'utf8');
+      const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+      
+      if (lines.length < 2) {
+        console.error('Error: CSV file is empty or invalid (must contain header and at least one secret)');
+        process.exit(1);
+      }
+      
+      // Parse header
+      const header = lines[0].split(',');
+      const expectedHeader = ['UUID', 'Name', 'Secret', 'Description', 'Created', 'Placeholder'];
+      if (header.length !== expectedHeader.length || !header.every((h, i) => h === expectedHeader[i])) {
+        console.error('Error: Invalid CSV format. Expected header: UUID,Name,Secret,Description,Created,Placeholder');
+        console.error(`Found header: ${header.join(',')}`);
+        process.exit(1);
+      }
+      
+      // Parse CSV values (handle quoted values)
+      const parseCsvLine = (line: string): string[] => {
+        const values: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          const nextChar = line[i + 1];
+          
+          if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+              // Escaped quote
+              current += '"';
+              i++; // Skip next quote
+            } else {
+              // Toggle quote state
+              inQuotes = !inQuotes;
+            }
+          } else if (char === ',' && !inQuotes) {
+            // End of value
+            values.push(current);
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        // Add last value
+        values.push(current);
+        return values;
+      };
+      
+      // Parse secrets from CSV
+      const importedSecrets: SecretsMap = {};
+      let importedCount = 0;
+      let skippedCount = 0;
+      let overwrittenCount = 0;
+      
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCsvLine(lines[i]);
+        
+        if (values.length !== expectedHeader.length) {
+          console.warn(`Warning: Skipping line ${i + 1} - invalid number of columns`);
+          skippedCount++;
+          continue;
+        }
+        
+        const [uuid, name, secret, description, created, placeholder] = values;
+        
+        if (!uuid || !secret) {
+          console.warn(`Warning: Skipping line ${i + 1} - missing UUID or Secret`);
+          skippedCount++;
+          continue;
+        }
+        
+        // Build secret data object
+        const secretData: SecretData = {
+          secret: secret
+        };
+        
+        if (name) {
+          secretData.name = name;
+        }
+        
+        if (description) {
+          secretData.description = description;
+        }
+        
+        if (created) {
+          secretData.created = created;
+        }
+        
+        // Check if secret already exists
+        if (existingSecrets[uuid]) {
+          const existingName = typeof existingSecrets[uuid] === 'object' && existingSecrets[uuid].name 
+            ? existingSecrets[uuid].name 
+            : uuid;
+          console.log(`Info: Secret "${existingName}" (${uuid}) already exists, overwriting...`);
+          overwrittenCount++;
+        }
+        
+        importedSecrets[uuid] = secretData;
+        importedCount++;
+      }
+      
+      if (importedCount === 0) {
+        console.error('Error: No valid secrets found in CSV file');
+        process.exit(1);
+      }
+      
+      // Merge imported secrets with existing secrets
+      store.secrets = {
+        ...existingSecrets,
+        ...importedSecrets
+      };
+      
+      // Get password (existing vault or new vault)
+      const password = await vault.getPassword({ ...globalOpts, vaultExists }, secretsPath);
+      
+      // Encrypt and save the vault
+      await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
+      
+      console.log(`\nSuccessfully imported ${importedCount} secret(s) from: ${resolvedPath}`);
+      if (overwrittenCount > 0) {
+        console.log(`Info: ${overwrittenCount} existing secret(s) were overwritten`);
+      }
+      if (skippedCount > 0) {
+        console.log(`Warning: Skipped ${skippedCount} invalid line(s)`);
+      }
+      if (vaultExists) {
+        console.log(`Vault updated at: ${secretsPath}`);
+      } else {
+        console.log(`Vault created at: ${secretsPath}`);
+      }
+      console.log('Note: Run "index" command to index files containing these secrets');
+    } catch (err) {
+      console.error('Error importing secrets:', (err as Error).message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('index [path] [pattern]')
   .description('Index files containing secrets for faster encrypt/decrypt operations')
   .option('--all', 'Index all files (default is git-modified files only)')

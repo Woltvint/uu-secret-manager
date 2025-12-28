@@ -8,6 +8,7 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Automatically places secrets file in git repository root
 - List all stored secrets
 - Export secrets to CSV for backup or migration
+- Import secrets from CSV to recreate vault with different password
 - Add new secrets with UUID-based or custom-named placeholders
 - Modify existing secrets by their custom name
 - Delete secrets by their custom name or UUID
@@ -203,6 +204,44 @@ npx github:Woltvint/repo-secret-manager export ./secrets-backup.csv
 ```
 
 The CSV file will contain columns: UUID, Name, Secret, Description, Created, Placeholder
+
+### Import Secrets from CSV
+
+Import secrets from a CSV file (created by the `export` command). This is useful for recreating a vault with a different password or migrating secrets to a new repository.
+
+**Important Notes:**
+- If vault exists, imported secrets are merged with existing secrets
+- If a secret with the same UUID already exists, it will be overwritten (with an info message)
+- The CSV file must be in the format created by the `export` command
+- UUIDs from the CSV are preserved (useful for maintaining placeholder compatibility)
+- Custom names, descriptions, and creation dates are preserved
+- The index is preserved if importing into an existing vault (run `index` command to update it)
+
+```bash
+repo-secret-manager import ./secrets-backup.csv
+```
+
+**Example Workflow:**
+```bash
+# 1. Export secrets from vault
+repo-secret-manager export ./secrets-backup.csv
+
+# 2a. Import into existing vault (merges secrets, overwrites duplicates)
+repo-secret-manager import ./secrets-backup.csv
+# Prompts for existing vault password
+
+# 2b. Import into new vault (creates new vault)
+repo-secret-manager import ./secrets-backup.csv
+# Prompts for new vault password
+
+# 3. Update index if needed
+repo-secret-manager index
+```
+
+**Error Handling:**
+- Invalid CSV format or missing required fields will skip those lines with warnings
+- Empty CSV files will result in an error
+- If a secret with the same UUID already exists, it will be overwritten with an info message
 
 ### Index Files for Faster Operations
 
@@ -475,6 +514,9 @@ repo-secret-manager delete "35f8756c-5cf3-455e-b843-b73fa87769c6"
 
 # 11. Export secrets to CSV for backup
 repo-secret-manager export ./secrets-backup.csv
+
+# 11a. Import secrets from CSV (useful for recreating vault with different password)
+repo-secret-manager import ./secrets-backup.csv
 
 # 12. Work with a different repository
 repo-secret-manager -r /path/to/other/repo add "another-secret"
