@@ -16,14 +16,14 @@ const program = new Command();
  */
 function findGitRoot(startPath?: string): string | null {
   let currentPath = path.resolve(startPath || '.');
-  
+
   while (currentPath !== path.parse(currentPath).root) {
     if (fs.existsSync(path.join(currentPath, '.git'))) {
       return currentPath;
     }
     currentPath = path.dirname(currentPath);
   }
-  
+
   return null;
 }
 
@@ -46,7 +46,7 @@ function getSecretsPath(repoPath?: string): string {
 program
   .name('repo-secret-manager')
   .description('CLI to manage secrets in files and folders')
-  .version('2.1.0-DEV')
+  .version('2.1.0-beta.1')
   .option('-r, --repo <path>', 'Path to git repository (default: current directory)', '.')
   .option('-p, --password <password>', 'Vault password (not recommended for security)')
   .option('-f, --password-file <path>', 'Path to file containing vault password')
@@ -83,7 +83,7 @@ program
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -96,10 +96,10 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       console.log('Secrets:');
       console.log('━'.repeat(80));
-      
+
       Object.entries(secrets).forEach(([id, data]) => {
         // Handle both old format (string) and new format (object)
         const secret = typeof data === 'string' ? data : data.secret;
@@ -107,7 +107,7 @@ program
         const created = typeof data === 'object' ? data.created : '';
         const name = typeof data === 'object' ? data.name : undefined;
         const placeholder = generatePlaceholder(id, data);
-        
+
         console.log(`\nUUID: ${id}`);
         if (name) {
           console.log(`Name: ${name}`);
@@ -121,7 +121,7 @@ program
         }
         console.log(`Placeholder: ${placeholder}`);
       });
-      
+
       console.log('\n' + '━'.repeat(80));
       console.log(`Total secrets: ${Object.keys(secrets).length}`);
     } catch (err) {
@@ -148,7 +148,7 @@ program
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -161,17 +161,17 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       // Build CSV content
       const csvLines: string[] = ['UUID,Name,Secret,Description,Created,Placeholder'];
-      
+
       Object.entries(secrets).forEach(([id, data]) => {
         const secret = typeof data === 'string' ? data : data.secret;
         const description = typeof data === 'object' ? data.description || '' : '';
         const created = typeof data === 'object' ? data.created || '' : '';
         const name = typeof data === 'object' ? data.name || '' : '';
         const placeholder = generatePlaceholder(id, data);
-        
+
         // Escape CSV values (handle commas and quotes)
         const escapeCsv = (value: string): string => {
           if (value.includes(',') || value.includes('"') || value.includes('\n')) {
@@ -179,7 +179,7 @@ program
           }
           return value;
         };
-        
+
         csvLines.push([
           escapeCsv(id),
           escapeCsv(name),
@@ -189,11 +189,11 @@ program
           escapeCsv(placeholder)
         ].join(','));
       });
-      
+
       const csvContent = csvLines.join('\n');
       const resolvedPath = path.resolve(csvPath);
       fs.writeFileSync(resolvedPath, csvContent, 'utf8');
-      
+
       console.log(`Exported ${Object.keys(secrets).length} secrets to: ${resolvedPath}`);
     } catch (err) {
       console.error('Error exporting secrets:', (err as Error).message);
@@ -213,19 +213,19 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
       const vaultExists = fs.existsSync(secretsPath);
-      
+
       // Load existing vault if it exists
       let store: SecretsStore;
       let existingSecrets: SecretsMap = {};
-      
+
       if (vaultExists) {
         // Load existing vault
         const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
-        
+
         try {
           store = JSON.parse(decrypted);
           // Handle old format without index
@@ -244,22 +244,22 @@ program
           index: undefined
         };
       }
-      
+
       // Read and parse CSV file
       const resolvedPath = path.resolve(csvPath);
       if (!fs.existsSync(resolvedPath)) {
         console.error(`Error: CSV file not found: ${resolvedPath}`);
         process.exit(1);
       }
-      
+
       const csvContent = fs.readFileSync(resolvedPath, 'utf8');
       const lines = csvContent.split('\n').filter(line => line.trim() !== '');
-      
+
       if (lines.length < 2) {
         console.error('Error: CSV file is empty or invalid (must contain header and at least one secret)');
         process.exit(1);
       }
-      
+
       // Parse header
       const header = lines[0].split(',');
       const expectedHeader = ['UUID', 'Name', 'Secret', 'Description', 'Created', 'Placeholder'];
@@ -268,17 +268,17 @@ program
         console.error(`Found header: ${header.join(',')}`);
         process.exit(1);
       }
-      
+
       // Parse CSV values (handle quoted values)
       const parseCsvLine = (line: string): string[] => {
         const values: string[] = [];
         let current = '';
         let inQuotes = false;
-        
+
         for (let i = 0; i < line.length; i++) {
           const char = line[i];
           const nextChar = line[i + 1];
-          
+
           if (char === '"') {
             if (inQuotes && nextChar === '"') {
               // Escaped quote
@@ -300,77 +300,77 @@ program
         values.push(current);
         return values;
       };
-      
+
       // Parse secrets from CSV
       const importedSecrets: SecretsMap = {};
       let importedCount = 0;
       let skippedCount = 0;
       let overwrittenCount = 0;
-      
+
       for (let i = 1; i < lines.length; i++) {
         const values = parseCsvLine(lines[i]);
-        
+
         if (values.length !== expectedHeader.length) {
           console.warn(`Warning: Skipping line ${i + 1} - invalid number of columns`);
           skippedCount++;
           continue;
         }
-        
+
         const [uuid, name, secret, description, created, placeholder] = values;
-        
+
         if (!uuid || !secret) {
           console.warn(`Warning: Skipping line ${i + 1} - missing UUID or Secret`);
           skippedCount++;
           continue;
         }
-        
+
         // Build secret data object
         const secretData: SecretData = {
           secret: secret
         };
-        
+
         if (name) {
           secretData.name = name;
         }
-        
+
         if (description) {
           secretData.description = description;
         }
-        
+
         if (created) {
           secretData.created = created;
         }
-        
+
         // Check if secret already exists
         if (existingSecrets[uuid]) {
-          const existingName = typeof existingSecrets[uuid] === 'object' && existingSecrets[uuid].name 
-            ? existingSecrets[uuid].name 
+          const existingName = typeof existingSecrets[uuid] === 'object' && existingSecrets[uuid].name
+            ? existingSecrets[uuid].name
             : uuid;
           console.log(`Info: Secret "${existingName}" (${uuid}) already exists, overwriting...`);
           overwrittenCount++;
         }
-        
+
         importedSecrets[uuid] = secretData;
         importedCount++;
       }
-      
+
       if (importedCount === 0) {
         console.error('Error: No valid secrets found in CSV file');
         process.exit(1);
       }
-      
+
       // Merge imported secrets with existing secrets
       store.secrets = {
         ...existingSecrets,
         ...importedSecrets
       };
-      
+
       // Get password (existing vault or new vault)
       const password = await vault.getPassword({ ...globalOpts, vaultExists }, secretsPath);
-      
+
       // Encrypt and save the vault
       await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
-      
+
       console.log(`\nSuccessfully imported ${importedCount} secret(s) from: ${resolvedPath}`);
       if (overwrittenCount > 0) {
         console.log(`Info: ${overwrittenCount} existing secret(s) were overwritten`);
@@ -403,10 +403,10 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
-      
+
       const vaultExists = fs.existsSync(secretsPath);
       if (!vaultExists) {
         console.error('Error: Vault file does not exist');
@@ -416,7 +416,7 @@ program
       const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -427,12 +427,12 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       console.log('Indexing files...');
       if (pattern) {
         console.log(`Pattern: ${pattern}`);
       }
-      
+
       let specificFiles: string[] | undefined;
       // Default to git-modified and .gitignore files unless --all is specified
       if (!cmdOptions.all) {
@@ -444,19 +444,19 @@ program
       } else {
         console.log('Mode: Indexing all files');
       }
-      
+
       const newIndexedFiles = encrypt.indexFiles(searchPath, store.secrets, pattern, gitRoot, specificFiles);
-      
+
       // Merge with existing index when using git-modified mode
       if (!cmdOptions.all && store.index && store.index.length > 0) {
         // Create a map of existing indexed files by path (relative paths)
         const existingMap = new Map(store.index.map(f => [f.path, f]));
-        
+
         // Update or add new indexed files
         newIndexedFiles.forEach(newFile => {
           existingMap.set(newFile.path, newFile);
         });
-        
+
         // Remove files that no longer exist (convert relative to absolute to check)
         const finalIndex: encrypt.IndexedFile[] = [];
         existingMap.forEach((file, relativePath) => {
@@ -465,15 +465,15 @@ program
             finalIndex.push(file);
           }
         });
-        
+
         store.index = finalIndex;
       } else {
         // Replace entire index when using --all or when no existing index
         store.index = newIndexedFiles;
       }
-      
+
       await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
-      
+
       console.log(`\nIndexed ${store.index!.length} files containing secrets`);
       if (store.index!.length > 0) {
         console.log('\nFiles indexed:');
@@ -500,9 +500,9 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
-      
+
       const vaultExists = fs.existsSync(secretsPath);
       if (!vaultExists) {
         console.error('Error: Vault file does not exist');
@@ -512,7 +512,7 @@ program
       const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -523,18 +523,18 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       // Check if index exists
       if (!store.index || store.index.length === 0) {
         console.log('No index found in the store.');
         console.log('Run "index" command to create an index.');
         process.exit(0);
       }
-      
+
       console.log('Index contents:');
       console.log('━'.repeat(80));
       console.log(`Total indexed files: ${store.index.length}\n`);
-      
+
       store.index.forEach((indexedFile: encrypt.IndexedFile, index: number) => {
         console.log(`${index + 1}. ${indexedFile.path}`);
         console.log(`   Secrets: ${indexedFile.secretIds.length}`);
@@ -570,9 +570,9 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
-      
+
       const vaultExists = fs.existsSync(secretsPath);
       if (!vaultExists) {
         console.error('Error: Vault file does not exist');
@@ -582,7 +582,7 @@ program
       const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -593,21 +593,21 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       // Check if index exists
       if (!store.index || store.index.length === 0) {
         console.log('No index found in the store.');
         process.exit(0);
       }
-      
+
       const indexCount = store.index.length;
-      
+
       // Clear the index
       store.index = undefined;
-      
+
       // Save the updated store
       await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
-      
+
       console.log(`Index cleared successfully (removed ${indexCount} indexed file(s)).`);
       console.log('Run "index" command to recreate the index.');
     } catch (err) {
@@ -626,7 +626,7 @@ program
       let customName: string | undefined;
       let secret: string;
       let desc: string | undefined;
-      
+
       if (args.length === 0) {
         console.error('Error: Secret value is required');
         console.error('Usage: add [name] <secret> [description]');
@@ -650,14 +650,14 @@ program
         secret = args[1];
         desc = args[2];
       }
-      
+
       const globalOpts = command.parent!.opts();
       const repoPath = globalOpts.repo;
       const secretsPath = getSecretsPath(repoPath);
       const vaultExists = fs.existsSync(secretsPath);
       const password = await vault.getPassword({ ...globalOpts, vaultExists }, secretsPath);
       let store: SecretsStore = { secrets: {}, index: undefined };
-      
+
       if (vaultExists) {
         try {
           const decrypted = await vault.decryptVaultFile(secretsPath, password);
@@ -672,7 +672,7 @@ program
           process.exit(1);
         }
       }
-      
+
       // Check for duplicate secret value
       for (const [existingUuid, data] of Object.entries(store.secrets)) {
         const existingSecret = typeof data === 'string' ? data : data.secret;
@@ -683,7 +683,7 @@ program
           process.exit(1);
         }
       }
-      
+
       // Check if custom name is provided and if it already exists
       if (customName) {
         // Validate name format (alphanumeric, underscore, hyphen)
@@ -691,28 +691,28 @@ program
           console.error('Error: Name must contain only alphanumeric characters, underscores, or hyphens');
           process.exit(1);
         }
-        
+
         if (nameExists(store.secrets, customName)) {
           console.error(`Error: A secret with name "${customName}" already exists`);
           console.error('Use "modify" command to update an existing secret, or choose a different name');
           process.exit(1);
         }
       }
-      
+
       const uuid = uuidv4();
       const secretData: SecretData = {
         secret: secret,
         description: desc || '',
         created: new Date().toISOString()
       };
-      
+
       // Add custom name if provided
       if (customName) {
         secretData.name = customName;
       }
-      
+
       store.secrets[uuid] = secretData;
-      
+
       await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
       const placeholder = generatePlaceholder(uuid, secretData);
       console.log(`Secret added with placeholder: ${placeholder}`);
@@ -744,7 +744,7 @@ program
       }
       const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       let store: SecretsStore = { secrets: {}, index: undefined };
-      
+
       try {
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
         store = JSON.parse(decrypted);
@@ -757,7 +757,7 @@ program
         console.error('Make sure the secrets file exists and the password is correct');
         process.exit(1);
       }
-      
+
       // Find the secret by name
       const found = findSecretByName(store.secrets, name);
       if (!found) {
@@ -765,10 +765,10 @@ program
         console.error('Use "list" command to see all available secrets');
         process.exit(1);
       }
-      
+
       const [id, oldData] = found;
       const oldSecret = typeof oldData === 'string' ? oldData : oldData.secret;
-      
+
       // Update the secret value
       if (typeof oldData === 'string') {
         // Convert old format to new format
@@ -787,7 +787,7 @@ program
           name: name
         };
       }
-      
+
       await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
       const placeholder = generatePlaceholder(id, store.secrets[id]);
       console.log(`Secret "${name}" modified successfully`);
@@ -818,7 +818,7 @@ program
       }
       const password = await vault.getPassword({ ...globalOpts, vaultExists: true }, secretsPath);
       let store: SecretsStore = { secrets: {}, index: undefined };
-      
+
       try {
         const decrypted = await vault.decryptVaultFile(secretsPath, password);
         store = JSON.parse(decrypted);
@@ -831,7 +831,7 @@ program
         console.error('Make sure the secrets file exists and the password is correct');
         process.exit(1);
       }
-      
+
       // Find the secret by name or UUID
       const found = findSecretByIdentifier(store.secrets, identifier);
       if (!found) {
@@ -839,15 +839,15 @@ program
         console.error('Use "list" command to see all available secrets');
         process.exit(1);
       }
-      
+
       const [id, data] = found;
       const secret = typeof data === 'string' ? data : data.secret;
       const name = typeof data === 'object' ? data.name : undefined;
       const placeholder = generatePlaceholder(id, data);
-      
+
       // Delete the secret
       delete store.secrets[id];
-      
+
       // Update index to remove references to this secret
       if (store.index) {
         store.index = store.index.map(indexedFile => ({
@@ -855,7 +855,7 @@ program
           secretIds: indexedFile.secretIds.filter(secretId => secretId !== id)
         })).filter(indexedFile => indexedFile.secretIds.length > 0);
       }
-      
+
       await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
       console.log(`Secret "${identifier}" deleted successfully`);
       console.log(`Note: Placeholders in files (${placeholder}) will remain but will not be decrypted.`);
@@ -879,10 +879,10 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
-      
+
       const vaultExists = fs.existsSync(secretsPath);
       if (!vaultExists) {
         console.error('Error: Vault file does not exist');
@@ -893,7 +893,7 @@ program
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -907,9 +907,9 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       let encryptedFiles = 0;
-      
+
       // Use index if available and no specific path given and --noindex is not set
       if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
@@ -935,7 +935,7 @@ program
         } else {
           console.log('Performing full directory scan (specific path provided)...');
         }
-        
+
         const stats = fs.statSync(searchPath);
         if (stats.isFile()) {
           if (encrypt.encryptSecretsInFile(searchPath, secrets)) {
@@ -953,7 +953,7 @@ program
           }, gitRoot);
         }
       }
-      
+
       if (encryptedFiles === 0) {
         console.log('No secrets encrypted.');
       }
@@ -976,10 +976,10 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
-      
+
       const vaultExists = fs.existsSync(secretsPath);
       if (!vaultExists) {
         console.error('Error: Vault file does not exist');
@@ -990,7 +990,7 @@ program
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -1004,9 +1004,9 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       let decryptedFiles = 0;
-      
+
       // Use index if available and no specific path given
       if (store.index && store.index.length > 0 && !targetPath) {
         console.log(`Using index (${store.index.length} files)...`);
@@ -1025,7 +1025,7 @@ program
         if (store.index && !targetPath) {
           console.log('No index found. Run "index" command first for faster operation.');
         }
-        
+
         const stats = fs.statSync(searchPath);
         if (stats.isFile()) {
           if (encrypt.decryptSecretsInFile(searchPath, secrets)) {
@@ -1043,7 +1043,7 @@ program
           }, gitRoot);
         }
       }
-      
+
       if (decryptedFiles === 0) {
         console.log('No placeholders decrypted.');
       }
@@ -1068,10 +1068,10 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
-      
+
       const vaultExists = fs.existsSync(secretsPath);
       if (!vaultExists) {
         console.error('Error: Vault file does not exist');
@@ -1082,7 +1082,7 @@ program
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -1096,11 +1096,11 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       let redactedFiles = 0;
       let gitignoreUpdated = false;
       let gitRemovedFiles = 0;
-      
+
       // Use index if available and no specific path given and --noindex is not set
       if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: processing ${store.index.length} indexed file(s)...`);
@@ -1125,13 +1125,13 @@ program
                 console.log(`Updating redacted file: ${redactedRelativePath}`);
                 redactedFiles++;
               }
-              
+
               // Add original file to .gitignore if not disabled (only if file was created or updated)
               if (!result.unchanged && !cmdOptions.nogitignore) {
                 if (encrypt.addToGitignore(absolutePath, gitRoot)) {
                   gitignoreUpdated = true;
                 }
-                
+
                 // Remove file from git if tracked and not disabled (only if file was created or updated)
                 if (!cmdOptions.nogitremove) {
                   if (encrypt.removeFileFromGit(absolutePath, gitRoot)) {
@@ -1154,7 +1154,7 @@ program
         } else {
           console.log('Performing full directory scan (specific path provided)...');
         }
-        
+
         const stats = fs.statSync(searchPath);
         if (stats.isFile()) {
           // Skip if already a redacted file
@@ -1170,13 +1170,13 @@ program
                 console.log(`Updating redacted file: ${result.redactedPath}`);
                 redactedFiles++;
               }
-              
+
               // Add original file to .gitignore if not disabled (only if file was created or updated)
               if (!result.unchanged && !cmdOptions.nogitignore) {
                 if (encrypt.addToGitignore(searchPath, gitRoot)) {
                   gitignoreUpdated = true;
                 }
-                
+
                 // Remove file from git if tracked and not disabled (only if file was created or updated)
                 if (!cmdOptions.nogitremove) {
                   if (encrypt.removeFileFromGit(searchPath, gitRoot)) {
@@ -1205,13 +1205,13 @@ program
                 console.log(`Updating redacted file: ${redactedRelativePath}`);
                 redactedFiles++;
               }
-              
+
               // Add original file to .gitignore if not disabled (only if file was created or updated)
               if (!result.unchanged && !cmdOptions.nogitignore) {
                 if (encrypt.addToGitignore(filePath, gitRoot)) {
                   gitignoreUpdated = true;
                 }
-                
+
                 // Remove file from git if tracked and not disabled (only if file was created or updated)
                 if (!cmdOptions.nogitremove) {
                   if (encrypt.removeFileFromGit(filePath, gitRoot)) {
@@ -1223,7 +1223,7 @@ program
           }, gitRoot);
         }
       }
-      
+
       if (redactedFiles === 0) {
         console.log('No redacted files created.');
       } else {
@@ -1254,10 +1254,10 @@ program
         console.error('Error: Not in a git repository');
         process.exit(1);
       }
-      
+
       const searchPath = targetPath ? path.resolve(targetPath) : gitRoot;
       const secretsPath = path.join(gitRoot, 'repo-secret-manager.vault');
-      
+
       const vaultExists = fs.existsSync(secretsPath);
       if (!vaultExists) {
         console.error('Error: Vault file does not exist');
@@ -1268,7 +1268,7 @@ program
       const decrypted = await vault.decryptVaultFile(secretsPath, password);
       let store: SecretsStore;
       let secrets: SecretsMap;
-      
+
       try {
         store = JSON.parse(decrypted);
         // Handle old format without index
@@ -1282,9 +1282,9 @@ program
         console.error('Error: Could not parse secrets file');
         process.exit(1);
       }
-      
+
       let unredactedFiles = 0;
-      
+
       const processRedactedFile = (filePath: string) => {
         if (encrypt.isRedactedFile(filePath)) {
           const result = encrypt.unredactSecretsInFile(filePath, secrets);
@@ -1303,7 +1303,7 @@ program
           }
         }
       };
-      
+
       // Use index if available and no specific path given and --noindex is not set
       if (store.index && store.index.length > 0 && !targetPath && !cmdOptions.noindex) {
         console.log(`Using index: checking ${store.index.length} indexed file(s) for redacted versions...`);
@@ -1321,7 +1321,7 @@ program
             // Convert original path to redacted path
             redactedPath = encrypt.getRedactedFilePath(absolutePath);
           }
-          
+
           if (fs.existsSync(redactedPath)) {
             processRedactedFile(redactedPath);
           }
@@ -1338,7 +1338,7 @@ program
         } else {
           console.log('Performing full directory scan (specific path provided)...');
         }
-        
+
         const stats = fs.statSync(searchPath);
         if (stats.isFile()) {
           processRedactedFile(searchPath);
@@ -1352,7 +1352,7 @@ program
           }, gitRoot);
         }
       }
-      
+
       if (unredactedFiles === 0) {
         console.log('No redacted files found to unredact.');
       } else {
@@ -1383,25 +1383,25 @@ program
     const RED = '\x1b[31m';
     const YELLOW = '\x1b[33m';
     const RESET = '\x1b[0m';
-    
+
     const hookPath = '.git/hooks/pre-commit';
-    
+
     if (!fs.existsSync('.git')) {
       console.error(`${RED}Error: Not a git repository${RESET}`);
       process.exit(1);
     }
-    
+
     if (!fs.existsSync(hookPath)) {
       console.log(`${YELLOW}ℹ️  No pre-commit hook found${RESET}`);
       process.exit(0);
     }
-    
+
     const hookContent = fs.readFileSync(hookPath, 'utf8');
     if (!hookContent.includes('repo-secret-manager')) {
       console.log(`${YELLOW}ℹ️  Pre-commit hook is not from repo-secret-manager${RESET}`);
       process.exit(0);
     }
-    
+
     // Restore backup if it exists
     const backupPath = hookPath + '.backup';
     if (fs.existsSync(backupPath)) {

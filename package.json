@@ -1,6 +1,6 @@
 {
   "name": "repo-secret-manager",
-  "version": "2.1.0-DEV",
+  "version": "2.1.0-beta.1",
   "description": "CLI tool to manage secrets in files with encrypted storage",
   "main": "dist/cli.js",
   "types": "dist/cli.d.ts",
