@@ -20,7 +20,7 @@ if (!fs.existsSync(secretsPath)) {
 // Try to reindex git-modified files for accurate checking
 try {
   console.log(`${YELLOW}Reindexing git-modified files...${RESET}`);
-  execSync('npx . index', { 
+  execSync('npx . index', {
     encoding: 'utf8',
     stdio: 'inherit'
   });
@@ -49,7 +49,7 @@ let foundIssues = false;
 
 for (const file of stagedFiles) {
   // Skip binary files, node_modules, and the secrets file itself
-  if (file === secretsPath || 
+  if (file === secretsPath ||
       file.includes('node_modules') ||
       file.match(/\.(png|jpg|jpeg|gif|ico|pdf|zip|tar|gz|bin|exe)$/i)) {
     continue;
@@ -57,7 +57,7 @@ for (const file of stagedFiles) {
 
   try {
     const content = fs.readFileSync(file, 'utf8');
-    
+
     // Check for common secret patterns that are NOT placeholders
     const secretPatterns = [
       { pattern: /password\s*[=:]\s*["'](?!<!secret_)[^"'\s]{8,}["']/gi, name: 'password' },
@@ -69,9 +69,9 @@ for (const file of stagedFiles) {
       { pattern: /PRIVATE[_-]?KEY/gi, name: 'private key' },
       { pattern: /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----/gi, name: 'private key block' },
     ];
-    
+
     let fileHasIssues = false;
-    
+
     for (const { pattern, name } of secretPatterns) {
       const matches = content.match(pattern);
       if (matches && matches.length > 0) {
@@ -83,11 +83,11 @@ for (const file of stagedFiles) {
         console.error(`   ${YELLOW}• Found ${name}: ${matches[0].substring(0, 40)}...${RESET}`);
       }
     }
-    
+
     if (fileHasIssues) {
-      console.error(`   ${GREEN}💡 Consider: npx . add "<secret>" then npx . encrypt "${file}"${RESET}`);
+      console.error(`   ${GREEN}💡 Consider: npx . add "<secret>" then npx . encrypt "${file}" or npx . redact "${file}"${RESET}`);
     }
-    
+
   } catch (error) {
     // Skip files that can't be read as text
     continue;
@@ -100,10 +100,10 @@ if (foundIssues) {
   console.error(`${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}`);
   console.error(`\n${YELLOW}Recommendations:${RESET}`);
   console.error(`  1. Use: ${GREEN}npx . add "<your-secret>"${RESET} to store secrets`);
-  console.error(`  2. Use: ${GREEN}npx . encrypt <file-or-directory>${RESET} to replace with placeholders`);
+  console.error(`  2. Use: ${GREEN}npx . encrypt <file-or-directory>${RESET} or ${GREEN}npx . redact <file-or-directory>${RESET} to replace with placeholders`);
   console.error(`  3. Review the changes and stage again\n`);
   console.error(`${YELLOW}To commit anyway (NOT recommended), use: git commit --no-verify${RESET}\n`);
-  
+
   process.exit(1);
 }
 
