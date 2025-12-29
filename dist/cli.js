@@ -72,6 +72,30 @@ function getSecretsPath(repoPath) {
     }
     return path.join(gitRoot, 'repo-secret-manager.vault');
 }
+/**
+ * Checks if a secret value already exists in the secrets map
+ * @param secrets - Map of secrets to check against
+ * @param secretValue - The secret value to check for duplicates
+ * @param excludeUuid - Optional UUID to exclude from the check (e.g., when updating an existing secret)
+ * @returns Object with duplicate information if found, null otherwise
+ */
+function findDuplicateSecretValue(secrets, secretValue, excludeUuid) {
+    for (const [uuid, data] of Object.entries(secrets)) {
+        // Skip if this is the secret being excluded (e.g., updating)
+        if (excludeUuid && uuid === excludeUuid) {
+            continue;
+        }
+        const existingSecret = typeof data === 'string' ? data : data.secret;
+        if (existingSecret === secretValue) {
+            const name = typeof data === 'object' && data.name
+                ? data.name
+                : uuid;
+            const placeholder = (0, encrypt_1.generatePlaceholder)(uuid, data);
+            return { uuid, name, placeholder };
+        }
+    }
+    return null;
+}
 program
     .name('repo-secret-manager')
     .description('CLI to manage secrets in files and folders')
@@ -367,6 +391,26 @@ program
                 // No UUID and no name - generate new UUID
                 targetUuid = (0, uuid_1.v4)();
                 updateMethod = 'new';
+            }
+            // Check for duplicate secret value to prevent ambiguity in redact operations
+            // Skip the secret being updated (if updating) to allow value changes
+            const excludeUuid = isUpdate ? targetUuid : undefined;
+            // Check if this secret value already exists in existing secrets
+            const duplicateInExisting = findDuplicateSecretValue(existingSecrets, secret, excludeUuid);
+            if (duplicateInExisting) {
+                console.warn(`Warning: Skipping line ${i + 1} - secret value already exists`);
+                console.warn(`  Existing secret: "${duplicateInExisting.name}" (${duplicateInExisting.uuid})`);
+                console.warn(`  Use placeholder: ${duplicateInExisting.placeholder}`);
+                skippedCount++;
+                continue;
+            }
+            // Also check if this secret value already exists in imported secrets (same CSV)
+            const duplicateInImported = findDuplicateSecretValue(importedSecrets, secret, excludeUuid);
+            if (duplicateInImported) {
+                console.warn(`Warning: Skipping line ${i + 1} - duplicate secret value in CSV`);
+                console.warn(`  First occurrence: "${duplicateInImported.name}" (${duplicateInImported.uuid})`);
+                skippedCount++;
+                continue;
             }
             // Build secret data object
             const secretData = {
@@ -705,14 +749,11 @@ program
             }
         }
         // Check for duplicate secret value
-        for (const [existingUuid, data] of Object.entries(store.secrets)) {
-            const existingSecret = typeof data === 'string' ? data : data.secret;
-            if (existingSecret === secret) {
-                const placeholder = (0, encrypt_1.generatePlaceholder)(existingUuid, data);
-                console.error(`Error: Secret already exists`);
-                console.error(`Use the existing placeholder: ${placeholder}`);
-                process.exit(1);
-            }
+        const duplicate = findDuplicateSecretValue(store.secrets, secret);
+        if (duplicate) {
+            console.error(`Error: Secret already exists`);
+            console.error(`Use the existing placeholder: ${duplicate.placeholder}`);
+            process.exit(1);
         }
         // Check if custom name is provided and if it already exists
         if (customName) {
