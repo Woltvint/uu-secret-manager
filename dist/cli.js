@@ -270,9 +270,12 @@ program
         }
         const csvContent = fs.readFileSync(resolvedPath, 'utf8');
         const lines = csvContent.split('\n').filter(line => line.trim() !== '');
-        if (lines.length < 2) {
-            console.error('Error: CSV file is empty or invalid (must contain header and at least one secret)');
+        if (lines.length < 1) {
+            console.error('Error: CSV file is empty');
             process.exit(1);
+        }
+        if (lines.length === 1) {
+            console.warn('Warning: CSV file contains only header, no secrets to import');
         }
         // Parse header
         const header = lines[0].split(',');
@@ -327,40 +330,76 @@ program
                 continue;
             }
             const [uuid, name, secret, description, created, placeholder] = values;
-            if (!uuid || !secret) {
-                console.warn(`Warning: Skipping line ${i + 1} - missing UUID or Secret`);
+            // Check if secret field is missing (undefined or null), but allow empty strings
+            if (secret === undefined || secret === null) {
+                console.warn(`Warning: Skipping line ${i + 1} - missing Secret field`);
                 skippedCount++;
                 continue;
+            }
+            // Determine the UUID to use
+            let targetUuid;
+            let isUpdate = false;
+            let updateMethod = '';
+            if (uuid && uuid.trim()) {
+                // UUID provided - use it
+                targetUuid = uuid.trim();
+                if (existingSecrets[targetUuid]) {
+                    isUpdate = true;
+                    updateMethod = 'UUID';
+                }
+            }
+            else if (name && name.trim()) {
+                // No UUID but name provided - search by name
+                const found = (0, encrypt_1.findSecretByName)(existingSecrets, name.trim());
+                if (found) {
+                    // Found by name - use existing UUID
+                    targetUuid = found[0];
+                    isUpdate = true;
+                    updateMethod = 'name';
+                }
+                else {
+                    // Not found by name - generate new UUID
+                    targetUuid = (0, uuid_1.v4)();
+                    updateMethod = 'new';
+                }
+            }
+            else {
+                // No UUID and no name - generate new UUID
+                targetUuid = (0, uuid_1.v4)();
+                updateMethod = 'new';
             }
             // Build secret data object
             const secretData = {
                 secret: secret
             };
-            if (name) {
-                secretData.name = name;
+            if (name && name.trim()) {
+                secretData.name = name.trim();
             }
-            if (description) {
-                secretData.description = description;
+            if (description && description.trim()) {
+                secretData.description = description.trim();
             }
-            if (created) {
-                secretData.created = created;
+            if (created && created.trim()) {
+                secretData.created = created.trim();
             }
-            // Check if secret already exists
-            if (existingSecrets[uuid]) {
-                const existingName = typeof existingSecrets[uuid] === 'object' && existingSecrets[uuid].name
-                    ? existingSecrets[uuid].name
-                    : uuid;
-                console.log(`Info: Secret "${existingName}" (${uuid}) already exists, overwriting...`);
+            // Log update information
+            if (isUpdate) {
+                const existingData = existingSecrets[targetUuid];
+                const existingName = typeof existingData === 'object' && existingData.name
+                    ? existingData.name
+                    : targetUuid;
+                if (updateMethod === 'UUID') {
+                    console.log(`Info: Secret "${existingName}" (${targetUuid}) already exists, overwriting...`);
+                }
+                else {
+                    const nameToShow = name && name.trim() ? name.trim() : 'unnamed';
+                    console.log(`Info: Secret with name "${nameToShow}" already exists (${targetUuid}), overwriting...`);
+                }
                 overwrittenCount++;
             }
-            importedSecrets[uuid] = secretData;
+            importedSecrets[targetUuid] = secretData;
             importedCount++;
         }
-        if (importedCount === 0) {
-            console.error('Error: No valid secrets found in CSV file');
-            process.exit(1);
-        }
-        // Merge imported secrets with existing secrets
+        // Merge imported secrets with existing secrets (even if none were imported)
         store.secrets = {
             ...existingSecrets,
             ...importedSecrets
@@ -369,20 +408,34 @@ program
         const password = await vault.getPassword({ ...globalOpts, vaultExists }, secretsPath);
         // Encrypt and save the vault
         await vault.encryptVaultFile(secretsPath, password, JSON.stringify(store, null, 2));
-        console.log(`\nSuccessfully imported ${importedCount} secret(s) from: ${resolvedPath}`);
-        if (overwrittenCount > 0) {
-            console.log(`Info: ${overwrittenCount} existing secret(s) were overwritten`);
-        }
-        if (skippedCount > 0) {
-            console.log(`Warning: Skipped ${skippedCount} invalid line(s)`);
-        }
-        if (vaultExists) {
-            console.log(`Vault updated at: ${secretsPath}`);
+        if (importedCount === 0) {
+            console.log(`\nNo secrets to import from: ${resolvedPath}`);
+            if (skippedCount > 0) {
+                console.log(`Warning: Skipped ${skippedCount} invalid line(s)`);
+            }
+            if (vaultExists) {
+                console.log(`Vault remains unchanged at: ${secretsPath}`);
+            }
+            else {
+                console.log(`Empty vault created at: ${secretsPath}`);
+            }
         }
         else {
-            console.log(`Vault created at: ${secretsPath}`);
+            console.log(`\nSuccessfully imported ${importedCount} secret(s) from: ${resolvedPath}`);
+            if (overwrittenCount > 0) {
+                console.log(`Info: ${overwrittenCount} existing secret(s) were overwritten`);
+            }
+            if (skippedCount > 0) {
+                console.log(`Warning: Skipped ${skippedCount} invalid line(s)`);
+            }
+            if (vaultExists) {
+                console.log(`Vault updated at: ${secretsPath}`);
+            }
+            else {
+                console.log(`Vault created at: ${secretsPath}`);
+            }
+            console.log('Note: Run "index" command to index files containing these secrets');
         }
-        console.log('Note: Run "index" command to index files containing these secrets');
     }
     catch (err) {
         console.error('Error importing secrets:', err.message);
