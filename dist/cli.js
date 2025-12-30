@@ -526,6 +526,11 @@ program
                 }
                 overwrittenCount++;
             }
+            else {
+                // Log new secret information
+                const nameToShow = name && name.trim() ? name.trim() : 'unnamed';
+                console.log(`Info: Adding new secret "${nameToShow}" (${targetUuid})`);
+            }
             importedSecrets[targetUuid] = secretData;
             importedCount++;
         }
