@@ -73,6 +73,50 @@ function getSecretsPath(repoPath) {
     return path.join(gitRoot, 'repo-secret-manager.vault');
 }
 /**
+ * Validates if a string is in ISO8601 format
+ * @param dateString - String to validate
+ * @returns true if the string is valid ISO8601 format, false otherwise
+ */
+function isValidISO8601(dateString) {
+    // ISO8601 format patterns:
+    // YYYY-MM-DDTHH:mm:ss.sssZ (with milliseconds and timezone)
+    // YYYY-MM-DDTHH:mm:ssZ (without milliseconds, with timezone)
+    // YYYY-MM-DDTHH:mm:ss (without timezone)
+    // YYYY-MM-DD (date only)
+    // Simplified approach: validate basic structure, then use Date parsing
+    // Date part: YYYY-MM-DD (required)
+    const datePartPattern = /^\d{4}-\d{2}-\d{2}/;
+    if (!datePartPattern.test(dateString)) {
+        return false;
+    }
+    // Time part is optional: THH:mm:ss.sssZ or THH:mm:ssZ or THH:mm:ss
+    // If present, must start with T
+    if (dateString.length > 10) {
+        if (dateString[10] !== 'T') {
+            return false;
+        }
+        // After T, should have time format
+        const timePart = dateString.substring(11);
+        // Time format: HH:mm:ss or HH:mm:ss.sss or HH:mm:ssZ or HH:mm:ss.sssZ or HH:mm:ss+HH:mm or HH:mm:ss.sss+HH:mm
+        const timePattern = /^\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})?$/;
+        if (!timePattern.test(timePart)) {
+            return false;
+        }
+    }
+    // Additional validation: try to parse and check if it's a valid date
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+        return false;
+    }
+    // Check if the parsed date string matches the input (handles edge cases)
+    // This ensures the date string is actually in ISO format, not just parseable
+    const isoString = date.toISOString();
+    const datePrefix = dateString.substring(0, 10);
+    return isoString.startsWith(datePrefix) ||
+        dateString === isoString ||
+        dateString === isoString.substring(0, 19) + 'Z';
+}
+/**
  * Checks if a secret value already exists in the secrets map
  * @param secrets - Map of secrets to check against
  * @param secretValue - The secret value to check for duplicates
@@ -448,8 +492,24 @@ program
             if (description && description.trim()) {
                 secretData.description = description.trim();
             }
-            if (created && created.trim()) {
-                secretData.created = created.trim();
+            // Handle Created field: validate ISO8601 format or use current datetime
+            const trimmedCreated = created ? created.trim() : '';
+            if (trimmedCreated) {
+                // Validate ISO8601 format by attempting to parse it
+                const parsedDate = new Date(trimmedCreated);
+                // Check if date is valid and matches ISO8601 format
+                // ISO8601 should be parseable and the string should match a valid ISO format
+                if (isNaN(parsedDate.getTime()) || !isValidISO8601(trimmedCreated)) {
+                    console.warn(`Warning: Line ${i + 1} - Invalid Created date format (expected ISO8601), using current datetime`);
+                    secretData.created = new Date().toISOString();
+                }
+                else {
+                    secretData.created = trimmedCreated;
+                }
+            }
+            else {
+                // No Created field provided, use current datetime
+                secretData.created = new Date().toISOString();
             }
             // Log update information
             if (isUpdate) {
