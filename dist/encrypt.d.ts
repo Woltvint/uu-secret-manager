@@ -55,9 +55,9 @@ export declare function findSecretByIdentifier(secrets: SecretsMap, identifier: 
  */
 export declare function getGitignoreFiles(gitRoot: string): string[];
 /**
- * Gets list of modified files in git (staged and unstaged) plus files from .gitignore
+ * Gets list of modified files in git (staged and unstaged), unversioned files, plus files from .gitignore
  * @param gitRoot - Root directory of the git repository
- * @returns Array of absolute file paths that have been modified or are in .gitignore
+ * @returns Array of absolute file paths that have been modified, are unversioned, or are in .gitignore
  */
 export declare function getGitModifiedFiles(gitRoot: string): string[];
 /**

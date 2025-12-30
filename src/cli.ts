@@ -565,12 +565,12 @@ program
       }
 
       let specificFiles: string[] | undefined;
-      // Default to git-modified and .gitignore files unless --all is specified
+      // Default to git-modified, unversioned, and .gitignore files unless --all is specified
       if (!cmdOptions.all) {
-        console.log('Mode: Git modified files and .gitignore files (use --all to index all files)');
+        console.log('Mode: Git modified files, unversioned files, and .gitignore files (use --all to index all files)');
         specificFiles = encrypt.getGitModifiedFiles(gitRoot);
         if (specificFiles.length === 0) {
-          console.log('No git-modified or .gitignore files found');
+          console.log('No git-modified, unversioned, or .gitignore files found');
         }
       } else {
         console.log('Mode: Indexing all files');

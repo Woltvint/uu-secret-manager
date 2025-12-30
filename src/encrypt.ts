@@ -155,14 +155,14 @@ export function getGitignoreFiles(gitRoot: string): string[] {
 }
 
 /**
- * Gets list of modified files in git (staged and unstaged) plus files from .gitignore
+ * Gets list of modified files in git (staged and unstaged), unversioned files, plus files from .gitignore
  * @param gitRoot - Root directory of the git repository
- * @returns Array of absolute file paths that have been modified or are in .gitignore
+ * @returns Array of absolute file paths that have been modified, are unversioned, or are in .gitignore
  */
 export function getGitModifiedFiles(gitRoot: string): string[] {
   const files: string[] = [];
   
-  // Get git-modified files
+  // Get git-modified files (staged and unstaged)
   try {
     // Get both staged and unstaged files
     const output = execSync('git diff --name-only HEAD && git diff --name-only --cached', {
@@ -179,6 +179,30 @@ export function getGitModifiedFiles(gitRoot: string): string[] {
       .filter(f => fs.existsSync(f) && fs.statSync(f).isFile());
     
     files.push(...gitFiles);
+  } catch (err) {
+    // If git command fails, continue with other file sources
+  }
+  
+  // Get unversioned files (files not tracked by git)
+  try {
+    // --others: show other (i.e. untracked) files
+    // --exclude-standard: exclude standard git exclusions (.gitignore, etc.)
+    // We want to include unversioned files even if they're in .gitignore
+    // since we're already checking .gitignore files separately
+    const unversionedOutput = execSync('git ls-files --others --exclude-standard', {
+      cwd: gitRoot,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    const unversionedFiles = unversionedOutput
+      .split('\n')
+      .filter(f => f.trim())
+      .map(f => path.join(gitRoot, f.trim()))
+      // Only include files that exist
+      .filter(f => fs.existsSync(f) && fs.statSync(f).isFile());
+    
+    files.push(...unversionedFiles);
   } catch (err) {
     // If git command fails, continue with .gitignore files
   }
