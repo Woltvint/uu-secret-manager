@@ -12,7 +12,7 @@ A Node.js CLI tool to manage secrets in Git repositories using encrypted storage
 - Add new secrets with UUID-based or custom-named placeholders
 - Modify existing secrets by their custom name
 - Delete secrets by their custom name or UUID
-- **Index files** for dramatically faster encrypt/decrypt operations (includes `.gitignore` files)
+- **Index files** for dramatically faster encrypt/decrypt operations (includes git-modified, unversioned, and `.gitignore` files)
 - **List index** to view all indexed files and their contained secrets
 - Encrypt secrets in files with placeholders (`<!secret_{uuid}!>` or `<!secret_{name}!>`) - in-place replacement
 - Decrypt placeholders back to original secrets - in-place replacement
@@ -247,10 +247,10 @@ repo-secret-manager index
 
 Index files containing secrets to dramatically speed up encrypt/decrypt operations. The index stores which files contain secrets, so subsequent encrypt/decrypt commands only process those files instead of scanning the entire repository.
 
-**Default Behavior**: By default, the index command indexes git-modified files (staged and unstaged changes) and files listed in `.gitignore` (exact file paths only, not patterns). This makes it fast and efficient for incremental updates. Use `--all` to index all files in the repository.
+**Default Behavior**: By default, the index command indexes git-modified files (staged and unstaged changes), unversioned files (files not tracked by Git), and files listed in `.gitignore` (exact file paths only, not patterns). This makes it fast and efficient for incremental updates. Use `--all` to index all files in the repository.
 
 ```bash
-# Index git-modified and .gitignore files (default - fast incremental update)
+# Index git-modified, unversioned, and .gitignore files (default - fast incremental update)
 repo-secret-manager index
 
 # Index all files in repository
@@ -271,7 +271,7 @@ repo-secret-manager index ./src --all
 
 **Performance**: After indexing, encrypt/decrypt operations only process indexed files, making them significantly faster for large repositories.
 
-**Incremental Updates**: The default git-modified behavior makes it easy to keep your index up-to-date by only re-indexing files that have changed. When using git-modified mode, the tool merges results with the existing index, preserving entries for files that haven't been modified. Use `--all` to completely rebuild the index from scratch.
+**Incremental Updates**: The default behavior makes it easy to keep your index up-to-date by only re-indexing files that have changed (git-modified), are new (unversioned), or are listed in `.gitignore`. When using the default mode, the tool merges results with the existing index, preserving entries for files that haven't been modified. Use `--all` to completely rebuild the index from scratch.
 
 ### List Index
 
