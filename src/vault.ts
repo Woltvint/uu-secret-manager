@@ -8,6 +8,10 @@ export interface VaultOptions {
   vaultExists?: boolean; // Indicates if vault file already exists
 }
 
+// Cache for password obtained during program execution
+// This prevents re-reading stdin (which gets exhausted) on subsequent calls
+let cachedPassword: string | null = null;
+
 /**
  * Prompts the user for a password input with hidden characters
  * @param question - The question to display to the user
@@ -82,7 +86,12 @@ function readPasswordFromStdin(): Promise<string | null> {
  * @returns Promise resolving to the password
  */
 export async function getPassword(options: VaultOptions = {}, vaultPath?: string): Promise<string> {
-  // Priority: 1. Password file, 2. Password param, 3. Stdin, 4. Prompt
+  // Priority: 0. Cached password, 1. Password file, 2. Password param, 3. Stdin, 4. Prompt
+  
+  // 0. Check cached password first (if we already obtained it in this run)
+  if (cachedPassword !== null) {
+    return cachedPassword;
+  }
   
   // 1. Check password file
   if (options.passwordFile) {
@@ -96,6 +105,8 @@ export async function getPassword(options: VaultOptions = {}, vaultPath?: string
           throw new Error('Invalid password in password file');
         }
       }
+      // Cache the password
+      cachedPassword = password;
       return password;
     } catch (err) {
       if ((err as Error).message === 'Invalid password in password file') {
@@ -115,6 +126,8 @@ export async function getPassword(options: VaultOptions = {}, vaultPath?: string
         throw new Error('Invalid password provided');
       }
     }
+    // Cache the password
+    cachedPassword = options.password;
     return options.password;
   }
   
@@ -129,6 +142,8 @@ export async function getPassword(options: VaultOptions = {}, vaultPath?: string
         throw new Error('Invalid password from stdin');
       }
     }
+    // Cache the password
+    cachedPassword = stdinPassword;
     return stdinPassword;
   }
   
@@ -153,6 +168,8 @@ export async function getPassword(options: VaultOptions = {}, vaultPath?: string
     }
   }
   
+  // Cache the password
+  cachedPassword = password;
   return password;
 }
 

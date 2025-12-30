@@ -38,6 +38,9 @@ exports.decryptVaultFile = decryptVaultFile;
 exports.encryptVaultFile = encryptVaultFile;
 const ansible_vault_1 = require("ansible-vault");
 const fs = __importStar(require("fs"));
+// Cache for password obtained during program execution
+// This prevents re-reading stdin (which gets exhausted) on subsequent calls
+let cachedPassword = null;
 /**
  * Prompts the user for a password input with hidden characters
  * @param question - The question to display to the user
@@ -109,7 +112,11 @@ function readPasswordFromStdin() {
  * @returns Promise resolving to the password
  */
 async function getPassword(options = {}, vaultPath) {
-    // Priority: 1. Password file, 2. Password param, 3. Stdin, 4. Prompt
+    // Priority: 0. Cached password, 1. Password file, 2. Password param, 3. Stdin, 4. Prompt
+    // 0. Check cached password first (if we already obtained it in this run)
+    if (cachedPassword !== null) {
+        return cachedPassword;
+    }
     // 1. Check password file
     if (options.passwordFile) {
         try {
@@ -123,6 +130,8 @@ async function getPassword(options = {}, vaultPath) {
                     throw new Error('Invalid password in password file');
                 }
             }
+            // Cache the password
+            cachedPassword = password;
             return password;
         }
         catch (err) {
@@ -143,6 +152,8 @@ async function getPassword(options = {}, vaultPath) {
                 throw new Error('Invalid password provided');
             }
         }
+        // Cache the password
+        cachedPassword = options.password;
         return options.password;
     }
     // 3. Check stdin (if piped)
@@ -157,6 +168,8 @@ async function getPassword(options = {}, vaultPath) {
                 throw new Error('Invalid password from stdin');
             }
         }
+        // Cache the password
+        cachedPassword = stdinPassword;
         return stdinPassword;
     }
     // 4. Prompt user with appropriate message
@@ -178,6 +191,8 @@ async function getPassword(options = {}, vaultPath) {
             }
         }
     }
+    // Cache the password
+    cachedPassword = password;
     return password;
 }
 /**
