@@ -310,7 +310,9 @@ program
       }
 
       const csvContent = fs.readFileSync(resolvedPath, 'utf8');
-      const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+      // Normalize line endings: replace CRLF (\r\n) and CR (\r) with LF (\n)
+      const normalizedContent = csvContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const lines = normalizedContent.split('\n').filter(line => line.trim() !== '');
       
       if (lines.length < 1) {
         console.error('Error: CSV file is empty');
