@@ -195,21 +195,48 @@ program
       // Build CSV content
       const csvLines: string[] = ['UUID,Name,Secret,Description,Created,Placeholder'];
 
-      Object.entries(secrets).forEach(([id, data]) => {
+      // Convert secrets to array and sort by name (alphabetically)
+      // Secrets without names come after secrets with names
+      const secretsArray = Object.entries(secrets).map(([id, data]) => {
         const secret = typeof data === 'string' ? data : data.secret;
         const description = typeof data === 'object' ? data.description || '' : '';
         const created = typeof data === 'object' ? data.created || '' : '';
         const name = typeof data === 'object' ? data.name || '' : '';
         const placeholder = generatePlaceholder(id, data);
+        
+        return { id, secret, description, created, name, placeholder };
+      });
 
-        // Escape CSV values (handle commas and quotes)
-        const escapeCsv = (value: string): string => {
-          if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-            return `"${value.replace(/"/g, '""')}"`;
-          }
-          return value;
-        };
+      // Sort by name: secrets with names first (alphabetically), then secrets without names (by UUID)
+      secretsArray.sort((a, b) => {
+        const aName = a.name || '';
+        const bName = b.name || '';
+        
+        // If both have names, sort alphabetically
+        if (aName && bName) {
+          return aName.localeCompare(bName);
+        }
+        // If only a has a name, it comes first
+        if (aName && !bName) {
+          return -1;
+        }
+        // If only b has a name, it comes first
+        if (!aName && bName) {
+          return 1;
+        }
+        // If neither has a name, sort by UUID
+        return a.id.localeCompare(b.id);
+      });
 
+      // Escape CSV values (handle commas and quotes)
+      const escapeCsv = (value: string): string => {
+        if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      };
+
+      secretsArray.forEach(({ id, secret, description, created, name, placeholder }) => {
         csvLines.push([
           escapeCsv(id),
           escapeCsv(name),
