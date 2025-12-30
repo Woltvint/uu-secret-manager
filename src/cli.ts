@@ -1254,6 +1254,7 @@ program
   .option('--nogitignore', 'Do not add original files to .gitignore')
   .option('--nogitremove', 'Do not remove tracked files from git')
   .option('--noindex', 'Do not use index, perform full directory scan')
+  .option('--no-normalize-eol', 'Do not normalize line endings (CRLF vs LF) when comparing files')
   .action(async (targetPath: string | undefined, cmdOptions, command) => {
     try {
       const globalOpts = command.parent!.opts();
@@ -1307,7 +1308,7 @@ program
             if (encrypt.isRedactedFile(absolutePath)) {
               return;
             }
-            const result = encrypt.redactSecretsInFile(absolutePath, secrets);
+            const result = encrypt.redactSecretsInFile(absolutePath, secrets, !cmdOptions.noNormalizeEol);
             if (result) {
               if (result.unchanged) {
                 // File exists and content is the same, no logging needed
@@ -1354,7 +1355,7 @@ program
         if (stats.isFile()) {
           // Skip if already a redacted file
           if (!encrypt.isRedactedFile(searchPath)) {
-            const result = encrypt.redactSecretsInFile(searchPath, secrets);
+            const result = encrypt.redactSecretsInFile(searchPath, secrets, !cmdOptions.noNormalizeEol);
             if (result) {
               if (result.unchanged) {
                 // File exists and content is the same, no logging needed
@@ -1387,7 +1388,7 @@ program
             if (filePath === secretsPath || encrypt.isRedactedFile(filePath)) {
               return;
             }
-            const result = encrypt.redactSecretsInFile(filePath, secrets);
+            const result = encrypt.redactSecretsInFile(filePath, secrets, !cmdOptions.noNormalizeEol);
             if (result) {
               if (result.unchanged) {
                 // File exists and content is the same, no logging needed
@@ -1440,6 +1441,7 @@ program
   .command('unredact [path]')
   .description('Restore secrets from redacted files. Takes files with ".redacted" in the name and creates files without ".redacted" containing real values.')
   .option('--noindex', 'Do not use index, perform full directory scan')
+  .option('--no-normalize-eol', 'Do not normalize line endings (CRLF vs LF) when comparing files')
   .action(async (targetPath: string | undefined, cmdOptions, command) => {
     try {
       const globalOpts = command.parent!.opts();
@@ -1482,7 +1484,7 @@ program
 
       const processRedactedFile = (filePath: string) => {
         if (encrypt.isRedactedFile(filePath)) {
-          const result = encrypt.unredactSecretsInFile(filePath, secrets);
+          const result = encrypt.unredactSecretsInFile(filePath, secrets, !cmdOptions.noNormalizeEol);
           if (result) {
             if (result.unchanged) {
               // File exists and content is the same, no logging needed

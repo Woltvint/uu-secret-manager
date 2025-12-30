@@ -368,11 +368,13 @@ Create redacted versions of files containing secrets. Redacted files have `.reda
 - The redact command respects `.gitignore` and will skip files that are ignored by git
 - If a redacted file already exists, it's only updated if the content differs
 - Files that already have `.redacted` in their name are skipped
+- By default, line endings (CRLF vs LF) are normalized when comparing files, so files differing only in line endings are considered unchanged
 
 **Options**:
 - `--nogitignore`: Do not add original files to `.gitignore`
 - `--nogitremove`: Do not remove tracked files from git
 - `--noindex`: Do not use index, perform full directory scan
+- `--no-normalize-eol`: Do not normalize line endings (CRLF vs LF) when comparing files
 
 ```bash
 # Create redacted files for entire repository (uses index if available)
@@ -395,6 +397,9 @@ repo-secret-manager redact --noindex
 
 # Combine options
 repo-secret-manager redact --noindex --nogitignore --nogitremove
+
+# Disable line ending normalization (compare files exactly as they are)
+repo-secret-manager redact --no-normalize-eol
 ```
 
 **Example:**
@@ -411,10 +416,11 @@ repo-secret-manager redact ./config.json
 
 Restore secrets from redacted files. Takes files with `.redacted` in their name and creates files without `.redacted` containing real secret values.
 
-**Note**: The unredact command respects `.gitignore` and will skip files that are ignored by git. If an index exists, it will use the indexed files to find corresponding redacted files for faster operation. If an unredacted file already exists, it's only updated if the content differs.
+**Note**: The unredact command respects `.gitignore` and will skip files that are ignored by git. If an index exists, it will use the indexed files to find corresponding redacted files for faster operation. If an unredacted file already exists, it's only updated if the content differs. By default, line endings (CRLF vs LF) are normalized when comparing files, so files differing only in line endings are considered unchanged.
 
 **Options**:
 - `--noindex`: Do not use index, perform full directory scan
+- `--no-normalize-eol`: Do not normalize line endings (CRLF vs LF) when comparing files
 
 ```bash
 # Unredact all redacted files in entire repository (uses index if available)
@@ -428,6 +434,9 @@ repo-secret-manager unredact ./config/database.redacted.yml
 
 # Force full directory scan (ignore index)
 repo-secret-manager unredact --noindex
+
+# Disable line ending normalization (compare files exactly as they are)
+repo-secret-manager unredact --no-normalize-eol
 ```
 
 **Example:**

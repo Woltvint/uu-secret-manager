@@ -391,12 +391,21 @@ export interface RedactResult {
 }
 
 /**
+ * Normalizes line endings by converting CRLF to LF
+ * @param text - Text to normalize
+ * @returns Normalized text with LF line endings
+ */
+function normalizeLineEndings(text: string): string {
+  return text.replace(/\r\n/g, '\n');
+}
+
+/**
  * Redacts secrets in a file by creating a new file with placeholders
  * @param filePath - Path to the original file
  * @param secrets - Map of UUIDs to secret data
  * @returns RedactResult with redacted path and status, or null if no secrets were found
  */
-export function redactSecretsInFile(filePath: string, secrets: SecretsMap): RedactResult | null {
+export function redactSecretsInFile(filePath: string, secrets: SecretsMap, normalizeEol: boolean = true): RedactResult | null {
   let content = fs.readFileSync(filePath, 'utf8');
   let changed = false;
   
@@ -420,7 +429,14 @@ export function redactSecretsInFile(filePath: string, secrets: SecretsMap): Reda
       // Compare content with existing file
       try {
         const existingContent = fs.readFileSync(redactedPath, 'utf8');
-        isUnchanged = existingContent === content;
+        if (normalizeEol) {
+          // Normalize line endings before comparison
+          const normalizedExisting = normalizeLineEndings(existingContent);
+          const normalizedNew = normalizeLineEndings(content);
+          isUnchanged = normalizedExisting === normalizedNew;
+        } else {
+          isUnchanged = existingContent === content;
+        }
       } catch {
         // If we can't read the file, assume it needs updating
         isUnchanged = false;
@@ -456,7 +472,7 @@ export interface UnredactResult {
  * @param secrets - Map of UUIDs to secret data
  * @returns UnredactResult with original path and status, or null if no placeholders were found
  */
-export function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): UnredactResult | null {
+export function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap, normalizeEol: boolean = true): UnredactResult | null {
   let content = fs.readFileSync(redactedFilePath, 'utf8');
   let changed = false;
   
@@ -480,7 +496,14 @@ export function unredactSecretsInFile(redactedFilePath: string, secrets: Secrets
       // Compare content with existing file
       try {
         const existingContent = fs.readFileSync(originalPath, 'utf8');
-        isUnchanged = existingContent === content;
+        if (normalizeEol) {
+          // Normalize line endings before comparison
+          const normalizedExisting = normalizeLineEndings(existingContent);
+          const normalizedNew = normalizeLineEndings(content);
+          isUnchanged = normalizedExisting === normalizedNew;
+        } else {
+          isUnchanged = existingContent === content;
+        }
       } catch {
         // If we can't read the file, assume it needs updating
         isUnchanged = false;

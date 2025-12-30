@@ -127,7 +127,7 @@ export interface RedactResult {
  * @param secrets - Map of UUIDs to secret data
  * @returns RedactResult with redacted path and status, or null if no secrets were found
  */
-export declare function redactSecretsInFile(filePath: string, secrets: SecretsMap): RedactResult | null;
+export declare function redactSecretsInFile(filePath: string, secrets: SecretsMap, normalizeEol?: boolean): RedactResult | null;
 /**
  * Result of unredact operation
  */
@@ -142,7 +142,7 @@ export interface UnredactResult {
  * @param secrets - Map of UUIDs to secret data
  * @returns UnredactResult with original path and status, or null if no placeholders were found
  */
-export declare function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap): UnredactResult | null;
+export declare function unredactSecretsInFile(redactedFilePath: string, secrets: SecretsMap, normalizeEol?: boolean): UnredactResult | null;
 /**
  * Checks if a file is tracked in git
  * @param filePath - Path to the file to check
